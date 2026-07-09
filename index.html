@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SAV Builder</title>
+    <link rel="stylesheet" href="styles.css?v=artwork-panel-guides-20260614">
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand-lockup">
+        <img class="brand-logo" src="assets/vivad-logo.png" alt="Vivad">
+        <div>
+          <p class="eyebrow">Print estimating</p>
+          <h1>SAV Builder</h1>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="ghost-button" id="open-gsheet" type="button">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+          Open GSheet
+        </button>
+        <a class="ghost-button action-link" href="https://vivad.com.au/shopping-cart" target="savBuilderCart">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6h15l-2 8H8L6 3H3M9 19a1 1 0 1 0 0 .01M18 19a1 1 0 1 0 0 .01"/></svg>
+          Open Cart
+        </a>
+        <button class="ghost-button" id="refresh-products" type="button">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.2 6.5M3 12A9 9 0 0 1 18.2 5.5M18 2v5h-5M6 22v-5h5"/></svg>
+          Refresh selector
+        </button>
+        <button class="primary-button" id="download-imposition" type="button" disabled>
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 21h14"/></svg>
+          Download imposition
+        </button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section class="setup-panel surface" aria-labelledby="setup-title">
+        <div class="section-heading">
+          <h2 id="setup-title">Job Setup</h2>
+          <span id="sheet-status" class="status-pill">Sheet: fallback</span>
+        </div>
+
+        <div class="product-search">
+          <label class="field product-search-field">
+            <span>Product search</span>
+            <input id="product-search" type="search" autocomplete="off" placeholder="Search product or laminate">
+          </label>
+          <div id="product-search-results" class="product-search-results" aria-live="polite"></div>
+        </div>
+
+        <div id="selector-survey" class="selector-survey"></div>
+
+        <div class="field">
+          <span>Bleed</span>
+          <div class="segmented" role="radiogroup" aria-label="Bleed type">
+            <label>
+              <input type="radio" name="bleed-type" value="none" checked>
+              <span>No bleed</span>
+            </label>
+            <label>
+              <input type="radio" name="bleed-type" value="all">
+              <span>All around</span>
+            </label>
+            <label>
+              <input type="radio" name="bleed-type" value="bottom-right">
+              <span>Bottom + right</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="input-grid">
+          <label class="field">
+            <span>Bleed mm</span>
+            <input id="bleed-mm" type="number" min="0" step="1" value="0">
+          </label>
+          <label class="field">
+            <span>Panel overlap mm</span>
+            <input id="overlap-mm" type="number" min="0" step="1" value="20">
+          </label>
+        </div>
+
+      </section>
+
+      <section class="input-panel surface" aria-labelledby="elements-title">
+        <div class="section-heading">
+          <h2 id="elements-title">Elements</h2>
+          <button class="ghost-button compact" id="load-sample" type="button">Sample</button>
+        </div>
+        <div class="entry-mode">
+          <div class="segmented two-way" role="radiogroup" aria-label="Element entry mode">
+            <label>
+              <input type="radio" name="element-entry-mode" value="table" checked>
+              <span>Table</span>
+            </label>
+            <label>
+              <input type="radio" name="element-entry-mode" value="csv">
+              <span>CSV</span>
+            </label>
+          </div>
+        </div>
+        <div id="element-csv-panel" hidden>
+          <textarea id="job-input" spellcheck="false" aria-label="Job element rows" placeholder="Shortname, Quantity, Width, Height"></textarea>
+        </div>
+        <div id="element-table-panel" class="element-table-panel" tabindex="0">
+          <div class="table-wrap element-table-wrap">
+            <table class="element-entry-table">
+              <thead>
+                <tr>
+                  <th>Shortname</th>
+                  <th>Qty</th>
+                  <th>Width</th>
+                  <th>Height</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="element-rows-body"></tbody>
+            </table>
+          </div>
+          <div class="table-actions">
+            <button class="ghost-button compact" id="add-element-row" type="button">Add row</button>
+          </div>
+        </div>
+        <div id="input-errors" class="error-list" role="alert"></div>
+      </section>
+
+      <section class="artwork-panel surface" aria-labelledby="artwork-title">
+        <div class="section-heading">
+          <h2 id="artwork-title">Artwork</h2>
+          <button class="ghost-button compact" id="clear-artwork" type="button">Clear</button>
+        </div>
+        <label class="upload-box">
+          <input id="artwork-upload" type="file" accept="image/*,application/pdf,.pdf" multiple>
+          <span>
+            <strong>Upload artwork files</strong>
+            <small>PNG, JPG, SVG, WebP, PDF</small>
+          </span>
+        </label>
+        <div id="artwork-list" class="artwork-list"></div>
+      </section>
+
+      <section class="results-panel surface" aria-labelledby="results-title">
+        <div class="section-heading">
+          <h2 id="results-title">Recommendation</h2>
+          <span id="roll-choice" class="status-pill positive">Ready</span>
+        </div>
+
+        <div class="metric-grid">
+          <div class="metric">
+            <span>Linear metres</span>
+            <strong id="metric-linear">0.00 m</strong>
+          </div>
+          <div class="metric">
+            <span>Panel joins</span>
+            <strong id="metric-joins">0</strong>
+          </div>
+          <div class="metric">
+            <span>Total price</span>
+            <strong id="metric-price">$0.00</strong>
+          </div>
+          <div class="metric">
+            <span>Amortised rate</span>
+            <strong id="metric-rate">$0.00 / sqm</strong>
+          </div>
+        </div>
+
+        <div class="breakdown" id="cost-breakdown" aria-label="Cost breakdown"></div>
+        <div id="offset-prompt" class="offset-prompt hidden"></div>
+      </section>
+
+      <section class="wide-panel surface" aria-labelledby="widths-title">
+        <div class="section-heading">
+          <h2 id="widths-title">Stock Options</h2>
+          <span id="option-count" class="muted"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Width</th>
+                <th>Joins</th>
+                <th>Nested lm</th>
+                <th>Offset nested lm</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="options-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="wide-panel surface" aria-labelledby="pricing-title">
+        <div class="section-heading">
+          <h2 id="pricing-title">Element Pricing</h2>
+          <div class="pricing-actions">
+            <span id="price-summary" class="muted"></span>
+            <button class="primary-button compact" id="add-all-cart" type="button" disabled>Add all to cart</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Shortname</th>
+                <th>Qty</th>
+                <th>Finished size</th>
+                <th>Print size</th>
+                <th>Drops</th>
+                <th>Area</th>
+                <th>Unit</th>
+                <th>Line total</th>
+                <th>Cart</th>
+              </tr>
+            </thead>
+            <tbody id="pricing-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="imposition-panel surface" aria-labelledby="imposition-title">
+        <div class="section-heading">
+          <h2 id="imposition-title">Imposition Preview</h2>
+          <span id="imposition-summary" class="muted"></span>
+        </div>
+        <div id="imposition-preview" class="preview-stage"></div>
+      </section>
+    </main>
+
+    <script src="pdfjs/pdf.classic.js"></script>
+    <script src="pdfjs/pdf.worker.classic.js"></script>
+    <script src="app.js?v=artwork-panel-guides-20260614"></script>
+  </body>
+</html>
