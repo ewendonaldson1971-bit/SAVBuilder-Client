@@ -1,12 +1,27 @@
 (function () {
   "use strict";
 
-  const SHEET_CSV_URL =
-    "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/gviz/tq?tqx=out:csv&sheet=Selector";
-  const SHEET_GVIZ_URL =
-    "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/gviz/tq?sheet=Selector";
-  const SHEET_EDIT_URL =
-    "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/edit?usp=sharing";
+  const APP_MODES = {
+    live: {
+      title: "SAV Builder-Live",
+      background: "#ffffff",
+      sheetCsvUrl: "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/gviz/tq?tqx=out:csv&sheet=Selector",
+      sheetGvizUrl: "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/gviz/tq?sheet=Selector",
+      sheetEditUrl: "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/edit?usp=sharing"
+    },
+    dev: {
+      title: "SAV Builder DEV",
+      background: "#fff8df",
+      sheetCsvUrl: "https://docs.google.com/spreadsheets/d/1Y6dRHL8FKb1DNZL0JWP7kJsf7DOFJd5ZhyXCHrXH_SU/gviz/tq?tqx=out:csv&gid=1922651000",
+      sheetGvizUrl: "https://docs.google.com/spreadsheets/d/1Y6dRHL8FKb1DNZL0JWP7kJsf7DOFJd5ZhyXCHrXH_SU/gviz/tq?gid=1922651000",
+      sheetEditUrl: "https://docs.google.com/spreadsheets/d/1Y6dRHL8FKb1DNZL0JWP7kJsf7DOFJd5ZhyXCHrXH_SU/edit?usp=sharing"
+    }
+  };
+  const APP_MODE = getAppMode();
+  const APP_CONFIG = APP_MODES[APP_MODE];
+  const SHEET_CSV_URL = APP_CONFIG.sheetCsvUrl;
+  const SHEET_GVIZ_URL = APP_CONFIG.sheetGvizUrl;
+  const SHEET_EDIT_URL = APP_CONFIG.sheetEditUrl;
   const SHEET_OPEN_PASSWORD = "1958-1960";
 
   const TILE_OFFSET_MM = 5;
@@ -99,8 +114,16 @@
 
   document.addEventListener("DOMContentLoaded", init);
 
+  function getAppMode() {
+    const params = new URLSearchParams(window.location.search);
+    const mode = String(params.get("mode") || params.get("appMode") || "").trim().toLowerCase();
+    const devFlag = String(params.get("dev") || "").trim().toLowerCase();
+    return mode === "dev" || devFlag === "1" || devFlag === "true" ? "dev" : "live";
+  }
+
   function init() {
     cacheUi();
+    applyAppMode();
     applySelectorData(parseSelectorCsv(FALLBACK_SELECTOR_CSV), "fallback");
     ui.jobInput.value = "";
     renderElementTableFromText();
@@ -111,6 +134,7 @@
 
   function cacheUi() {
     ui.selectorSurvey = document.getElementById("selector-survey");
+    ui.appTitle = document.getElementById("app-title");
     ui.productSearch = document.getElementById("product-search");
     ui.productSearchResults = document.getElementById("product-search-results");
     ui.sheetStatus = document.getElementById("sheet-status");
@@ -145,6 +169,12 @@
     ui.pricingBody = document.getElementById("pricing-body");
     ui.impositionSummary = document.getElementById("imposition-summary");
     ui.impositionPreview = document.getElementById("imposition-preview");
+  }
+
+  function applyAppMode() {
+    document.title = APP_CONFIG.title;
+    document.documentElement.style.setProperty("--paper", APP_CONFIG.background);
+    if (ui.appTitle) ui.appTitle.textContent = APP_CONFIG.title;
   }
 
   function attachEvents() {
