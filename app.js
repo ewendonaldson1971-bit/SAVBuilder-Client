@@ -7,6 +7,8 @@
       background: "#ffffff",
       sheetCsvUrl: "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/gviz/tq?tqx=out:csv&sheet=Selector",
       sheetGvizUrl: "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/gviz/tq?sheet=Selector",
+      configCsvUrl: "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/gviz/tq?tqx=out:csv&sheet=Config",
+      configGvizUrl: "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/gviz/tq?sheet=Config",
       sheetEditUrl: "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/edit?usp=sharing"
     },
     dev: {
@@ -14,6 +16,8 @@
       background: "#fff8df",
       sheetCsvUrl: "https://docs.google.com/spreadsheets/d/1Y6dRHL8FKb1DNZL0JWP7kJsf7DOFJd5ZhyXCHrXH_SU/gviz/tq?tqx=out:csv&gid=1922651000",
       sheetGvizUrl: "https://docs.google.com/spreadsheets/d/1Y6dRHL8FKb1DNZL0JWP7kJsf7DOFJd5ZhyXCHrXH_SU/gviz/tq?gid=1922651000",
+      configCsvUrl: "https://docs.google.com/spreadsheets/d/1Y6dRHL8FKb1DNZL0JWP7kJsf7DOFJd5ZhyXCHrXH_SU/gviz/tq?tqx=out:csv&sheet=Config",
+      configGvizUrl: "https://docs.google.com/spreadsheets/d/1Y6dRHL8FKb1DNZL0JWP7kJsf7DOFJd5ZhyXCHrXH_SU/gviz/tq?sheet=Config",
       sheetEditUrl: "https://docs.google.com/spreadsheets/d/1Y6dRHL8FKb1DNZL0JWP7kJsf7DOFJd5ZhyXCHrXH_SU/edit?usp=sharing"
     }
   };
@@ -21,6 +25,8 @@
   const APP_CONFIG = APP_MODES[APP_MODE];
   const SHEET_CSV_URL = APP_CONFIG.sheetCsvUrl;
   const SHEET_GVIZ_URL = APP_CONFIG.sheetGvizUrl;
+  const CONFIG_CSV_URL = APP_CONFIG.configCsvUrl;
+  const CONFIG_GVIZ_URL = APP_CONFIG.configGvizUrl;
   const SHEET_EDIT_URL = APP_CONFIG.sheetEditUrl;
   const SHEET_OPEN_PASSWORD = "1958-1960";
 
@@ -33,8 +39,27 @@
   const PRINT_PER_SQM = 15;
   const UNIT_PRICE = 0.5;
   const MAX_PREVIEW_PLACEMENTS = 2600;
+  const DEFAULT_PRICING_CONFIG = Object.freeze({
+    materialLoadingMm: MATERIAL_LOADING_MM,
+    edgePrintMarginMm: 0,
+    setupFee: SETUP_FEE,
+    trimPerLinearM: TRIM_PER_LINEAR_M,
+    stockMultiplier: STOCK_MULTIPLIER,
+    laminateMultiplier: LAMINATE_MULTIPLIER,
+    printPerSqm: PRINT_PER_SQM,
+    unitPrice: UNIT_PRICE
+  });
+  const BRAND_COLUMN = "Brand";
+  const BRAND_OPTIONS = [
+    { id: "all", label: "All", matches: [] },
+    { id: "avery", label: "Avery", matches: ["Avery"], logo: "assets/brands/avery-dennison.png?v=2" },
+    { id: "orafol", label: "Orafol", matches: ["Orafol"], logo: "assets/brands/orafol.svg?v=2" },
+    { id: "3m", label: "3M", matches: ["3M"], logo: "assets/brands/3m.png?v=2" }
+  ];
   const MOUNTING_SURFACE_COLUMN = "Mounting Surface";
   const LEGACY_SURFACE_COLUMN = "Surface";
+  const SURFACE_DESCRIPTION_COLUMN = "Surface Description";
+  const SURFACE_LINK_COLUMN = "Surface Link";
   const DERIVED_PERFORATION_COLUMN = "Perforation";
   const CART_WINDOW_NAME = "savBuilderCart";
   const CART_NAVIGATION_DELAY_MS = 1200;
@@ -95,8 +120,12 @@
     selectorColumns: [],
     postProductSelectorColumns: [],
     selectorSelections: {},
+    pricingConfig: { ...DEFAULT_PRICING_CONFIG },
+    brandFilter: "all",
     selectedProduct: null,
     productSearchQuery: "",
+    productSearchResults: [],
+    productSearchSelection: null,
     elementInputMode: "table",
     productSource: "fallback",
     useOffsetJoins: null,
@@ -127,6 +156,7 @@
     applySelectorData(parseSelectorCsv(FALLBACK_SELECTOR_CSV), "fallback");
     ui.jobInput.value = "";
     renderElementTableFromText();
+    renderBrandSelector();
     attachEvents();
     recalculate();
     refreshProducts();
@@ -135,6 +165,7 @@
   function cacheUi() {
     ui.selectorSurvey = document.getElementById("selector-survey");
     ui.appTitle = document.getElementById("app-title");
+    ui.brandSelector = document.getElementById("brand-selector");
     ui.productSearch = document.getElementById("product-search");
     ui.productSearchResults = document.getElementById("product-search-results");
     ui.sheetStatus = document.getElementById("sheet-status");
@@ -189,6 +220,20 @@
       applyProductSearchSelection(Number.parseInt(result.dataset.productSearchIndex, 10));
     });
 
+    ui.brandSelector.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-brand-filter]");
+      if (!button) return;
+      const brandFilter = button.dataset.brandFilter;
+      if (!getBrandOption(brandFilter) || state.brandFilter === brandFilter) return;
+      state.brandFilter = brandFilter;
+      state.selectorSelections = {};
+      state.productSearchSelection = null;
+      state.productSearchQuery = "";
+      ui.productSearch.value = "";
+      renderBrandSelector();
+      recalculate();
+    });
+
     ui.openGSheet.addEventListener("click", openGSheetWithPassword);
 
     ui.selectorSurvey.addEventListener("click", (event) => {
@@ -198,17 +243,20 @@
 
       if (reset) {
         state.selectorSelections = {};
+        state.productSearchSelection = null;
         recalculate();
         return;
       }
 
       if (back) {
+        state.productSearchSelection = null;
         undoLastSelectorSelection();
         recalculate();
         return;
       }
 
       if (!choice) return;
+      state.productSearchSelection = null;
       const column = choice.dataset.selectorColumn;
       state.selectorSelections[column] = choice.dataset.selectorValue;
       pruneSelectionsAfter(column);
@@ -761,6 +809,7 @@
 
   async function refreshProducts() {
     ui.sheetStatus.textContent = "Selector: loading";
+    await refreshPricingConfig();
     try {
       const selectorData = await loadSelectorFromGviz();
       if (!selectorData.rows.length) throw new Error("No selector rows in sheet");
@@ -776,6 +825,64 @@
     }
 
     recalculate();
+  }
+
+  async function refreshPricingConfig() {
+    state.pricingConfig = { ...DEFAULT_PRICING_CONFIG };
+    if (!CONFIG_GVIZ_URL && !CONFIG_CSV_URL) return;
+
+    try {
+      const config = await loadConfigFromGviz();
+      state.pricingConfig = {
+        ...DEFAULT_PRICING_CONFIG,
+        ...config
+      };
+    } catch (error) {
+      try {
+        const response = await fetch(`${CONFIG_CSV_URL}&_=${Date.now()}`, { cache: "reload" });
+        if (!response.ok) throw new Error("Config request failed");
+        state.pricingConfig = {
+          ...DEFAULT_PRICING_CONFIG,
+          ...parseConfigCsv(await response.text())
+        };
+      } catch (fallbackError) {
+        state.pricingConfig = { ...DEFAULT_PRICING_CONFIG };
+      }
+    }
+  }
+
+  function loadConfigFromGviz() {
+    return new Promise((resolve, reject) => {
+      const callbackName = `__rollStockConfig${Date.now()}${Math.floor(Math.random() * 10000)}`;
+      const script = document.createElement("script");
+      const timeout = window.setTimeout(() => {
+        cleanup();
+        reject(new Error("Config JSONP timed out"));
+      }, 5000);
+
+      function cleanup() {
+        window.clearTimeout(timeout);
+        delete window[callbackName];
+        script.remove();
+      }
+
+      window[callbackName] = (payload) => {
+        cleanup();
+        try {
+          resolve(parseConfigGviz(payload));
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      script.onerror = () => {
+        cleanup();
+        reject(new Error("Config JSONP failed"));
+      };
+
+      script.src = `${CONFIG_GVIZ_URL}&tqx=out:json;responseHandler:${callbackName}&_=${Date.now()}`;
+      document.head.appendChild(script);
+    });
   }
 
   async function loadSelectorFromCsvExport() {
@@ -823,7 +930,9 @@
     state.selectorColumns = selectorData.selectorColumns;
     state.postProductSelectorColumns = selectorData.postProductSelectorColumns || [];
     state.productSource = source;
+    state.productSearchSelection = null;
     validateSelectorSelections();
+    renderBrandSelector();
     ui.sheetStatus.textContent = source === "live" ? "Selector: live" : "Selector: fallback";
   }
 
@@ -876,6 +985,9 @@
   }
 
   function getSelectorState() {
+    const searchSelectionState = getActiveProductSearchSelectionState();
+    if (searchSelectionState) return searchSelectionState;
+
     const selections = state.selectorSelections;
     const candidates = getCandidateSelectorRows(selections);
     const question = getNextSelectorQuestion(candidates, selections);
@@ -893,6 +1005,36 @@
     };
   }
 
+  function getActiveProductSearchSelectionState() {
+    const selection = state.productSearchSelection;
+    if (!selection || !Array.isArray(selection.rows) || !selection.rows.length) return null;
+
+    const rows = selection.rows.filter((row) =>
+      state.selectorRows.includes(row) &&
+      row.isCompleteProduct &&
+      matchesSelectedBrand(row)
+    );
+    if (!rows.length) {
+      state.productSearchSelection = null;
+      return null;
+    }
+
+    const selections = { ...selection.selections };
+    const productName = selection.productName || selections.Product || rows[0].Product;
+    const product = buildProductFromRows(rows, productName, selections);
+    if (!product) return null;
+
+    return {
+      selections,
+      pathEntries: getProductSearchPathEntries(product),
+      candidates: rows,
+      question: null,
+      product,
+      hasRows: state.selectorRows.length > 0,
+      completeProductCount: rows.length
+    };
+  }
+
   function renderProductSearch() {
     const query = state.productSearchQuery.trim();
     if (ui.productSearch.value !== state.productSearchQuery) {
@@ -900,10 +1042,12 @@
     }
     if (!query) {
       ui.productSearchResults.innerHTML = "";
+      state.productSearchResults = [];
       return;
     }
 
     const results = getProductSearchResults(query);
+    state.productSearchResults = results;
     if (!results.length) {
       ui.productSearchResults.innerHTML = `<div class="product-search-empty">No matching products.</div>`;
       return;
@@ -911,87 +1055,199 @@
 
     ui.productSearchResults.innerHTML = `
       <div class="product-search-list">
-        ${results.map((result) => renderProductSearchResult(result)).join("")}
+        ${results.map((result, index) => renderProductSearchResult(result, index)).join("")}
       </div>
     `;
   }
 
   function getProductSearchResults(query) {
     const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-    const seen = new Set();
-    const results = [];
+    const grouped = new Map();
 
     state.selectorRows.forEach((row, index) => {
       if (!row.isCompleteProduct || !row.Product) return;
-      const haystack = `${row.Product || ""} ${row.Laminate || ""}`.toLowerCase();
-      if (!terms.every((term) => haystack.includes(term))) return;
+      if (!matchesSelectedBrand(row)) return;
+      const haystack = getProductSearchHaystack(row);
+      if (!terms.every((term) => matchesProductSearchTerm(haystack, term))) return;
 
-      const key = [
-        row.Product,
-        row.Laminate,
-        row[MOUNTING_SURFACE_COLUMN],
-        row["Internal/External"],
-        row.Type,
-        row[DERIVED_PERFORATION_COLUMN],
-        row.Longevity
-      ].map((value) => String(value || "").trim()).join("\u001f");
-      if (seen.has(key)) return;
-      seen.add(key);
-      results.push({ row, index });
+      const key = getProductSearchGroupKey(row);
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          row,
+          rows: [],
+          indexes: []
+        });
+      }
+      const result = grouped.get(key);
+      result.rows.push(row);
+      result.indexes.push(index);
     });
 
-    return results.slice(0, 20);
+    return Array.from(grouped.values()).slice(0, 20);
   }
 
-  function renderProductSearchResult({ row, index }) {
-    const meta = getProductSearchMeta(row);
+  function getProductSearchGroupKey(row) {
+    return [
+      row.Product,
+      row[BRAND_COLUMN],
+      row.Laminate,
+      row["Internal/External"],
+      row.Type,
+      row[DERIVED_PERFORATION_COLUMN],
+      row.Longevity,
+      getRollWidthLabels(row).join("|"),
+      getRollQCodes(row).join("|")
+    ].map((value) => String(value || "").trim()).join("\u001f");
+  }
+
+  function getProductSearchHaystack(row) {
+    const values = [
+      row.Product,
+      row.Laminate,
+      ...getRollQCodes(row)
+    ].filter(Boolean);
+
+    return {
+      text: values.join(" ").toLowerCase(),
+      normalized: values.map(normalizeKey).join(" ")
+    };
+  }
+
+  function matchesProductSearchTerm(haystack, term) {
+    const normalizedTerm = normalizeKey(term);
+    return haystack.text.includes(term) ||
+      (normalizedTerm && haystack.normalized.includes(normalizedTerm));
+  }
+
+  function renderProductSearchResult(result, index) {
+    const meta = getProductSearchMeta(result);
     return `
       <button class="product-search-result" type="button" data-product-search-index="${index}">
-        <strong>${escapeHtml(row.Product)}</strong>
+        <strong>${escapeHtml(result.row.Product)}</strong>
         ${meta ? `<span>${escapeHtml(meta)}</span>` : ""}
       </button>
     `;
   }
 
-  function getProductSearchMeta(row) {
+  function getProductSearchMeta(result) {
+    const row = result.row || result;
+    const surfaces = getProductSearchSurfaces(result);
     const parts = [
+      row[BRAND_COLUMN] ? `Brand: ${row[BRAND_COLUMN]}` : "",
       row.Laminate ? `Laminate: ${row.Laminate}` : "",
-      row[MOUNTING_SURFACE_COLUMN],
+      surfaces.length ? `${surfaces.length === 1 ? "Mounting surface" : "Mounting surfaces"}: ${surfaces.join(", ")}` : "",
       row["Internal/External"],
       row.Type,
       row[DERIVED_PERFORATION_COLUMN],
       row.Longevity
     ].filter(Boolean);
     const widths = row.rolls && row.rolls.length
-      ? row.rolls.map((roll) => `${formatInteger(roll.width)} mm`).join(", ")
+      ? getRollWidthLabels(row).join(", ")
       : "";
     if (widths) parts.push(widths);
+    const qcodes = getRollQCodes(row);
+    if (qcodes.length) parts.push(`${qcodes.length === 1 ? "QCode" : "QCodes"}: ${qcodes.join(", ")}`);
     return parts.join(" | ");
   }
 
-  function applyProductSearchSelection(rowIndex) {
-    const row = state.selectorRows[rowIndex];
-    if (!row) return;
+  function getProductSearchSurfaces(result) {
+    const rows = result.rows || [result.row || result];
+    return Array.from(new Set(rows
+      .map((row) => String(row[MOUNTING_SURFACE_COLUMN] || "").trim())
+      .filter(Boolean)));
+  }
+
+  function getRollQCodes(row) {
+    const qcodes = row.rolls && row.rolls.length
+      ? row.rolls.map((roll) => String(roll.qcode || "").trim())
+      : [];
+    return Array.from(new Set(qcodes.filter(Boolean)));
+  }
+
+  function getRollWidthLabels(row) {
+    return row.rolls && row.rolls.length
+      ? row.rolls.map((roll) => formatRollWidthLabel(roll))
+      : [];
+  }
+
+  function applyProductSearchSelection(resultIndex) {
+    const result = state.productSearchResults[resultIndex];
+    if (!result) return;
+    const rows = result.rows && result.rows.length ? result.rows : [result.row];
 
     const selections = {};
     getSelectorSelectionOrder().forEach((column) => {
-      const value = String(row[column] || "").trim();
-      if (value && isMeaningfulSelectorValue(value)) {
+      const value = getCommonSelectorValue(rows, column);
+      if (value) {
         selections[column] = value;
       }
     });
+    const productName = String(result.row?.Product || rows[0]?.Product || "").trim();
+    if (productName) {
+      selections.Product = productName;
+    }
 
     state.selectorSelections = selections;
+    validateSelectorSelections();
+    state.productSearchSelection = {
+      rows,
+      selections: { ...state.selectorSelections },
+      productName
+    };
     state.productSearchQuery = "";
     ui.productSearch.value = "";
-    validateSelectorSelections();
     recalculate();
+  }
+
+  function getCommonSelectorValue(rows, column) {
+    const values = Array.from(new Set(rows
+      .map((row) => String(row[column] || "").trim())
+      .filter(isMeaningfulSelectorValue)));
+    return values.length === 1 ? values[0] : "";
   }
 
   function getCandidateSelectorRows(selections) {
     return state.selectorRows.filter((row) =>
+      matchesSelectedBrand(row) &&
       Object.entries(selections).every(([column, value]) => !value || String(row[column] || "") === value)
     );
+  }
+
+  function getProductSearchPathEntries(product) {
+    const selections = product.selectorSelections || {};
+    return getSelectorSelectionOrder()
+      .filter((column) => column !== MOUNTING_SURFACE_COLUMN && selections[column])
+      .map((column) => ({ column, value: selections[column], inferred: false }));
+  }
+
+  function renderBrandSelector() {
+    if (!ui.brandSelector) return;
+    ui.brandSelector.innerHTML = BRAND_OPTIONS.map((option) => {
+      const selected = option.id === state.brandFilter;
+      const logo = option.logo
+        ? `<img src="${escapeHtml(option.logo)}" alt="" aria-hidden="true">`
+        : "";
+      return `
+        <button class="brand-button${selected ? " selected" : ""}" type="button" data-brand-filter="${escapeHtml(option.id)}" role="radio" aria-checked="${selected ? "true" : "false"}">
+          ${logo}
+          <span>${escapeHtml(option.label)}</span>
+        </button>
+      `;
+    }).join("");
+  }
+
+  function matchesSelectedBrand(row) {
+    return matchesBrandOption(row, getBrandOption(state.brandFilter));
+  }
+
+  function matchesBrandOption(row, option) {
+    if (!option || option.id === "all") return true;
+    const brandKey = normalizeKey(row[BRAND_COLUMN]);
+    return Boolean(brandKey) && option.matches.some((match) => brandKey.includes(normalizeKey(match)));
+  }
+
+  function getBrandOption(id) {
+    return BRAND_OPTIONS.find((option) => option.id === id) || BRAND_OPTIONS[0];
   }
 
   function getSelectorPathEntries(selections, candidates, question) {
@@ -1083,6 +1339,12 @@
     const productRows = completeRows.filter((row) => row.Product === productName);
     if (!productRows.length) return null;
 
+    return buildProductFromRows(productRows, productName, selections);
+  }
+
+  function buildProductFromRows(productRows, productName, selections) {
+    if (!productRows.length || !productName) return null;
+
     const rollsByWidth = new Map();
     productRows.forEach((row) => {
       row.rolls.forEach((roll) => {
@@ -1097,14 +1359,37 @@
     });
 
     const printSqmRate = productRows.find((row) => Number.isFinite(row.printSqmRate))?.printSqmRate;
+    const surfaceInfos = getProductSurfaceInfos(productRows);
+    const surfaceDescription = surfaceInfos.length === 1 ? surfaceInfos[0].description : "";
+    const surfaceLink = surfaceInfos.length === 1 ? surfaceInfos[0].link : "";
+    const mountingSurfaces = getDistinctValues(productRows, MOUNTING_SURFACE_COLUMN);
 
     return {
       name: productName.trim(),
       rolls: Array.from(rollsByWidth.values()).sort((a, b) => a.width - b.width),
       printSqmRate,
+      surfaceDescription,
+      surfaceLink,
+      surfaceInfos,
+      mountingSurfaces,
       selectorRow: productRows[0],
       selectorSelections: { ...selections }
     };
+  }
+
+  function getProductSurfaceInfos(productRows) {
+    const seen = new Set();
+    return productRows.map((row) => {
+      const info = {
+        surface: String(row[MOUNTING_SURFACE_COLUMN] || "").trim(),
+        description: String(row[SURFACE_DESCRIPTION_COLUMN] || "").trim(),
+        link: String(row[SURFACE_LINK_COLUMN] || "").trim()
+      };
+      const key = [info.surface, info.description, info.link].join("\u001f");
+      if (seen.has(key)) return null;
+      seen.add(key);
+      return info;
+    }).filter((info) => info && (info.surface || info.description || info.link));
   }
 
   function getDistinctValues(rows, column) {
@@ -1155,31 +1440,33 @@
   }
 
   function evaluateRoll(product, roll, elements, settings) {
+    const printableWidth = getPrintableRollWidth(roll);
+    const pricedRoll = { ...roll, printableWidth };
     const printDimensions = elements.map((element) => getPrintDimensions(element, settings));
     const maxUnrotatedPrintWidth = printDimensions.reduce((max, dims) => Math.max(max, dims.printWidth), 0);
-    const unrotatedFitCount = printDimensions.filter((dims) => dims.printWidth <= roll.width + 0.001).length;
+    const unrotatedFitCount = printDimensions.filter((dims) => dims.printWidth <= printableWidth + 0.001).length;
     const unrotatedFitsAll = unrotatedFitCount === elements.length;
     const evenElementPlans = elements.map((element, index) =>
-      chooseElementPlan(element, index, roll.width, settings, "even")
+      chooseElementPlan(element, index, printableWidth, settings, "even")
     );
     const offsetElementPlans = elements.map((element, index) =>
-      chooseElementPlan(element, index, roll.width, settings, "right-offset")
+      chooseElementPlan(element, index, printableWidth, settings, "right-offset")
     );
     const evenGroups = evenElementPlans.flatMap((plan) => plan.groups);
     const offsetGroups = offsetElementPlans.flatMap((plan) => plan.groups);
-    const evenPack = packGroupsBestFit(evenGroups, roll.width, "nested");
-    const offsetPack = packGroupsBestFit(offsetGroups, roll.width, "offset");
+    const evenPack = packGroupsBestFit(evenGroups, printableWidth, "nested");
+    const offsetPack = packGroupsBestFit(offsetGroups, printableWidth, "offset");
     const offsetSaves = offsetPack.lengthMm + 0.1 < evenPack.lengthMm;
     const selectedPack = settings.useOffsetJoins === true && offsetSaves ? offsetPack : evenPack;
     const elementPlans = settings.useOffsetJoins === true && offsetSaves ? offsetElementPlans : evenElementPlans;
     const groups = settings.useOffsetJoins === true && offsetSaves ? offsetGroups : evenGroups;
     const joins = elementPlans.reduce((total, plan) => total + plan.joins, 0);
-    const costs = calculateCosts(selectedPack, roll, elements, product.printSqmRate);
+    const costs = calculateCosts(selectedPack, pricedRoll, elements, product.printSqmRate);
 
     return {
       productName: product.name,
       printSqmRate: product.printSqmRate,
-      roll,
+      roll: pricedRoll,
       elementPlans,
       evenElementPlans,
       offsetElementPlans,
@@ -1194,6 +1481,12 @@
       maxUnrotatedPrintWidth,
       costs
     };
+  }
+
+  function getPrintableRollWidth(roll) {
+    const config = state.pricingConfig || DEFAULT_PRICING_CONFIG;
+    const edgeMargin = Math.max(0, cleanNumber(config.edgePrintMarginMm, 0));
+    return Math.max(1, roll.width - edgeMargin * 2);
   }
 
   function compareRollOptions(a, b) {
@@ -1661,27 +1954,29 @@
   }
 
   function calculateCosts(pack, roll, elements, printSqmRate) {
+    const config = state.pricingConfig || DEFAULT_PRICING_CONFIG;
     const printLinearM = pack.lengthMm / 1000;
-    const loadingLinearM = MATERIAL_LOADING_MM / 1000;
+    const loadingLinearM = config.materialLoadingMm / 1000;
     const stockLinearM = printLinearM + loadingLinearM;
     const laminateLinearM = roll.laminateCost > 0 ? printLinearM + loadingLinearM : 0;
+    const printableWidth = Math.max(1, cleanNumber(roll.printableWidth, roll.width));
     const stockAreaSqm = (roll.width / 1000) * stockLinearM;
-    const printAreaSqm = (roll.width / 1000) * printLinearM;
-    const productStockCharge = roll.productCost * stockLinearM * STOCK_MULTIPLIER;
-    const laminateCharge = roll.laminateCost * laminateLinearM * LAMINATE_MULTIPLIER;
+    const printAreaSqm = (printableWidth / 1000) * printLinearM;
+    const productStockCharge = roll.productCost * stockLinearM * config.stockMultiplier;
+    const laminateCharge = roll.laminateCost * laminateLinearM * config.laminateMultiplier;
     const stockCharge = productStockCharge + laminateCharge;
-    const printRate = Number.isFinite(printSqmRate) ? printSqmRate : PRINT_PER_SQM;
+    const printRate = Number.isFinite(printSqmRate) ? printSqmRate : config.printPerSqm;
     const printCharge = printAreaSqm * printRate;
     const trimCharge = elements.reduce((total, element) => {
       const perimeterM = (2 * (element.width + element.height)) / 1000;
-      return total + perimeterM * element.quantity * TRIM_PER_LINEAR_M;
+      return total + perimeterM * element.quantity * config.trimPerLinearM;
     }, 0);
-    const unitCharge = elements.reduce((total, element) => total + element.quantity * UNIT_PRICE, 0);
+    const unitCharge = elements.reduce((total, element) => total + element.quantity * config.unitPrice, 0);
     const finishedAreaSqm = elements.reduce(
       (total, element) => total + element.quantity * (element.width * element.height) / 1000000,
       0
     );
-    const total = SETUP_FEE + stockCharge + printCharge + trimCharge + unitCharge;
+    const total = config.setupFee + stockCharge + printCharge + trimCharge + unitCharge;
     const rate = finishedAreaSqm > 0 ? total / finishedAreaSqm : 0;
 
     return {
@@ -1699,7 +1994,7 @@
       printRate,
       trimCharge,
       unitCharge,
-      setupFee: SETUP_FEE,
+      setupFee: config.setupFee,
       finishedAreaSqm,
       total,
       rate
@@ -1746,6 +2041,87 @@
     return parseSelectorRows(parsedRows);
   }
 
+  function parseConfigCsv(csv) {
+    const rows = parseCsv(csv, ",").map((row) => row.map((cell) => String(cell || "").trim()));
+    return parseConfigRows(rows);
+  }
+
+  function parseConfigGviz(payload) {
+    const tableRows = payload && payload.table && Array.isArray(payload.table.rows)
+      ? payload.table.rows
+      : [];
+    const rows = tableRows.map((row) =>
+      (row.c || []).map((cell) => (cell && cell.v != null ? cell.v : ""))
+    );
+    return parseConfigRows(rows);
+  }
+
+  function parseConfigRows(rows) {
+    const config = {};
+    rows.forEach((row) => {
+      const key = normalizeConfigKey(row[0]);
+      const value = cleanNumber(row[1], NaN);
+      if (!key || !Number.isFinite(value)) return;
+      config[key] = normalizeConfigValue(key, value, row[2]);
+    });
+
+    return config;
+  }
+
+  function normalizeConfigValue(key, value, unit) {
+    if (key === "materialLoadingMm" && isMetresUnit(unit)) {
+      return value * 1000;
+    }
+    return value;
+  }
+
+  function normalizeConfigKey(label) {
+    const key = normalizeKey(label);
+    const aliases = {
+      materialloading: "materialLoadingMm",
+      materialloadingmm: "materialLoadingMm",
+      materialleaderlength: "materialLoadingMm",
+      loading: "materialLoadingMm",
+      loadinglength: "materialLoadingMm",
+      loadingmm: "materialLoadingMm",
+      leader: "materialLoadingMm",
+      leaderlength: "materialLoadingMm",
+      edgeprintmargin: "edgePrintMarginMm",
+      edgeprintmarginmm: "edgePrintMarginMm",
+      printmargin: "edgePrintMarginMm",
+      printmarginmm: "edgePrintMarginMm",
+      edgemargin: "edgePrintMarginMm",
+      edgemarginmm: "edgePrintMarginMm",
+      setup: "setupFee",
+      setupfee: "setupFee",
+      trimrate: "trimPerLinearM",
+      trimcost: "trimPerLinearM",
+      trimperlinearm: "trimPerLinearM",
+      materialmarkup: "stockMultiplier",
+      materialmultiplier: "stockMultiplier",
+      productmarkup: "stockMultiplier",
+      productmultiplier: "stockMultiplier",
+      stockmarkup: "stockMultiplier",
+      stockmultiplier: "stockMultiplier",
+      laminatemarkup: "laminateMultiplier",
+      laminatemultiplier: "laminateMultiplier",
+      lammarkup: "laminateMultiplier",
+      lammultiplier: "laminateMultiplier",
+      printsqmrate: "printPerSqm",
+      printpersqm: "printPerSqm",
+      defaultprintrate: "printPerSqm",
+      defaultprintsqmrate: "printPerSqm",
+      unitcost: "unitPrice",
+      unitprice: "unitPrice"
+    };
+    return aliases[key] || "";
+  }
+
+  function isMetresUnit(value) {
+    const key = normalizeKey(value);
+    return key === "m" || key === "metre" || key === "metres" || key === "meter" || key === "meters";
+  }
+
   function parseSelectorGviz(payload) {
     const headers = payload && payload.table && Array.isArray(payload.table.cols)
       ? payload.table.cols.map((column) => String(column.label || column.id || "").trim())
@@ -1768,6 +2144,8 @@
     const mountingSurfaceMatrixHeaderSet = new Set(mountingSurfaceMatrixColumns.map((column) => column.header));
     let baseSelectorColumns = headers
       .slice(0, productIndex >= 0 ? productIndex : headers.length)
+      .filter((header) => !isBrandColumnName(header))
+      .filter((header) => !isSurfaceMetadataColumnName(header))
       .filter((header) => !mountingSurfaceMatrixHeaderSet.has(header))
       .filter((header) => !hasMountingSurfaceMatrix || !isMatrixReplacedSelectorColumn(header))
       .filter(Boolean);
@@ -1776,6 +2154,8 @@
     }
     const postProductSelectorColumns = productIndex >= 0
       ? headers.slice(productIndex + 1)
+        .filter((header) => !isBrandColumnName(header))
+        .filter((header) => !isSurfaceMetadataColumnName(header))
         .filter((header) => header && isPostProductSelectorColumn(header))
         .filter((header) => !hasMountingSurfaceMatrix || !isMatrixReplacedSelectorColumn(header))
       : [];
@@ -1806,9 +2186,14 @@
     const boundary = getMountingSurfaceMatrixBoundary(headers, productIndex, startIndex);
 
     return headers.slice(startIndex, boundary)
-      .map((header, offset) => ({ header, index: startIndex + offset }))
+      .map((header, offset) => {
+        const index = startIndex + offset;
+        const descriptionIndex = getSurfaceMetadataIndex(headers, index, "description");
+        const linkIndex = getSurfaceMetadataIndex(headers, index, "link");
+        return { header, index, descriptionIndex, linkIndex };
+      })
       .filter((column) => column.header)
-      .filter((column) => rows.slice(1).some((row) => isTrueCell(row[column.index])));
+      .filter((column) => !isSurfaceMetadataColumnName(column.header));
   }
 
   function getMountingSurfaceMatrixStartIndex(rows, headers) {
@@ -1831,19 +2216,53 @@
 
   function getSuitableMountingSurfaces(row, mountingSurfaceMatrixColumns) {
     if (!mountingSurfaceMatrixColumns.length) {
-      return [""];
+      return [{ surface: "", description: "", link: "" }];
     }
 
     return mountingSurfaceMatrixColumns
       .filter((column) => isTrueCell(row[column.index]))
-      .map((column) => column.header);
+      .map((column) => ({
+        surface: column.header,
+        description: getSurfaceMetadataValue(row, column.descriptionIndex),
+        link: getSurfaceMetadataValue(row, column.linkIndex)
+      }));
   }
 
-  function prepareSelectorRow(sourceData, mountingSurface, hasMountingSurfaceMatrix, perforationColumn) {
+  function getSurfaceMetadataIndex(headers, surfaceIndex, type) {
+    const isExpectedHeader = type === "description" ? isSurfaceDescriptionColumnName : isSurfaceLinkColumnName;
+    const rightOffset = type === "description" ? 1 : 2;
+    const leftOffset = type === "description" ? -2 : -1;
+    const rightIndex = surfaceIndex + rightOffset;
+    const leftIndex = surfaceIndex + leftOffset;
+    if (isExpectedHeader(headers[rightIndex])) return rightIndex;
+    if (isExpectedHeader(headers[leftIndex])) return leftIndex;
+    return -1;
+  }
+
+  function getSurfaceMetadataValue(row, index) {
+    if (index < 0) return "";
+    return String(row[index] ?? "").trim();
+  }
+
+  function prepareSelectorRow(sourceData, mountingSurfaceInfo, hasMountingSurfaceMatrix, perforationColumn) {
     const data = { ...sourceData };
+    const surface = typeof mountingSurfaceInfo === "string"
+      ? mountingSurfaceInfo
+      : mountingSurfaceInfo.surface;
+    const description = typeof mountingSurfaceInfo === "object" && mountingSurfaceInfo
+      ? mountingSurfaceInfo.description
+      : "";
+    const link = typeof mountingSurfaceInfo === "object" && mountingSurfaceInfo
+      ? mountingSurfaceInfo.link
+      : "";
     if (hasMountingSurfaceMatrix) {
-      data[MOUNTING_SURFACE_COLUMN] = mountingSurface;
-      data[LEGACY_SURFACE_COLUMN] = mountingSurface;
+      data[MOUNTING_SURFACE_COLUMN] = surface;
+      data[LEGACY_SURFACE_COLUMN] = surface;
+      data[SURFACE_DESCRIPTION_COLUMN] = description;
+      data[SURFACE_LINK_COLUMN] = link;
+    } else {
+      data[SURFACE_DESCRIPTION_COLUMN] = getGeneralSurfaceDescription(sourceData);
+      data[SURFACE_LINK_COLUMN] = getGeneralSurfaceLink(sourceData);
     }
     const perforation = normalizePerforationValue(perforationColumn ? data[perforationColumn] : "") ||
       extractPerforationValue(data);
@@ -1876,10 +2295,12 @@
     const key = normalizeKey(header);
     return key === normalizeKey(LEGACY_SURFACE_COLUMN) ||
       key === normalizeKey(MOUNTING_SURFACE_COLUMN) ||
+      key === "internalexternal" ||
       key === "type" ||
       key === "printmode" ||
       key === "longevity" ||
       key === "laminate" ||
+      isBrandColumnName(header) ||
       isPerforationColumnName(header) ||
       isRollWidthColumnName(header) ||
       isProductCostColumnName(header) ||
@@ -1896,6 +2317,32 @@
       !isQCodeColumnName(header) &&
       !isIgnoredSelectorDataColumn(header) &&
       !isPrintRateColumnName(header);
+  }
+
+  function isBrandColumnName(header) {
+    return normalizeKey(header) === normalizeKey(BRAND_COLUMN);
+  }
+
+  function isSurfaceMetadataColumnName(header) {
+    return isSurfaceDescriptionColumnName(header) || isSurfaceLinkColumnName(header);
+  }
+
+  function isSurfaceDescriptionColumnName(header) {
+    const key = normalizeKey(header);
+    return key === "d" || key === "description" || key === "desc" || key === "surfacedescription";
+  }
+
+  function isSurfaceLinkColumnName(header) {
+    const key = normalizeKey(header);
+    return key === "l" || key === "link" || key === "url" || key === "surfacelink";
+  }
+
+  function getGeneralSurfaceDescription(row) {
+    return String(row[SURFACE_DESCRIPTION_COLUMN] || row.Description || row.Desc || row.D || "").trim();
+  }
+
+  function getGeneralSurfaceLink(row) {
+    return String(row[SURFACE_LINK_COLUMN] || row.Link || row.URL || row.L || "").trim();
   }
 
   function isIgnoredSelectorDataColumn(header) {
@@ -2159,7 +2606,7 @@
 
   function renderResults(best, options, elements) {
     const roll = best.roll;
-    ui.rollChoice.textContent = `${roll.width} mm stock`;
+    ui.rollChoice.textContent = getRollChoiceLabel(roll);
     ui.metricLinear.textContent = `${formatNumber(best.costs.linearM, 2)} m`;
     ui.metricJoins.textContent = formatInteger(best.joins);
     ui.metricPrice.textContent = formatMoney(best.costs.total);
@@ -2167,15 +2614,11 @@
     if (ui.printRateConstant) {
       ui.printRateConstant.textContent = `${formatMoney(best.costs.printRate)} / sqm`;
     }
-    const widestRoll = options.reduce((max, option) => Math.max(max, option.roll.width), 0);
+    const widestRoll = options.reduce((max, option) => Math.max(max, option.roll.printableWidth || option.roll.width), 0);
     const fitWarning = getStockFitWarning(best.maxUnrotatedPrintWidth, widestRoll);
     ui.costBreakdown.innerHTML = `
       ${fitWarning ? `<div class="fit-warning">${escapeHtml(fitWarning)}</div>` : ""}
       <div><span>Imposed length</span><strong>${formatNumber(best.costs.printLinearM, 2)} m</strong></div>
-      <div><span>Product stock length</span><strong>${formatNumber(best.costs.stockLinearM, 2)} m</strong></div>
-      ${best.costs.laminateLinearM ? `<div><span>Laminate length</span><strong>${formatNumber(best.costs.laminateLinearM, 2)} m</strong></div>` : ""}
-      <div><span>Trim perimeter</span><strong>${formatMoney(best.costs.trimCharge)}</strong></div>
-      <div><span>Unit charge</span><strong>${formatMoney(best.costs.unitCharge)}</strong></div>
     `;
     ui.downloadImposition.disabled = false;
 
@@ -2190,7 +2633,15 @@
       return "";
     }
 
-    return `Widest entered print width is ${formatInteger(requiredWidth)} mm, but this product only lists stock up to ${formatInteger(widestRoll)} mm. The job is being panelled; choose a product with wider stock or add that width to the Selector sheet to avoid joins.`;
+    return `Widest entered print width is ${formatInteger(requiredWidth)} mm, but this product only lists printable stock up to ${formatInteger(widestRoll)} mm. The job is being panelled; choose a product with wider stock or add that width to the Selector sheet to avoid joins.`;
+  }
+
+  function getRollChoiceLabel(roll) {
+    if (!roll || !Number.isFinite(roll.width)) return "Select product";
+    if (Number.isFinite(roll.printableWidth) && Math.abs(roll.printableWidth - roll.width) > 0.001) {
+      return `${formatInteger(roll.width)} mm stock (${formatInteger(roll.printableWidth)} mm printable)`;
+    }
+    return `${formatInteger(roll.width)} mm stock`;
   }
 
   function renderEmptyResults() {
@@ -2263,6 +2714,8 @@
       <div class="selected-product">
         <strong>${escapeHtml(product.name)}</strong>
         <div class="muted">${escapeHtml(product.rolls.map(formatRollLabel).join(" | "))}</div>
+        ${renderProductMountingSurfaces(product)}
+        ${renderProductSurfaceInfo(product)}
       </div>
     ` : (!selectorState.question ? `<div class="survey-empty">${escapeHtml(getSelectorEmptyMessage(selectorState))}</div>` : "");
 
@@ -2279,6 +2732,181 @@
       ${productMarkup}
       ${resetMarkup}
     `;
+    hydrateOpenGraphPreviews();
+  }
+
+  function renderProductMountingSurfaces(product) {
+    const surfaces = Array.isArray(product.mountingSurfaces) ? product.mountingSurfaces : [];
+    if (!surfaces.length) return "";
+    const label = surfaces.length === 1 ? "Mounting surface" : "Mounting surfaces";
+    return `<div class="muted">${escapeHtml(`${label}: ${surfaces.join(", ")}`)}</div>`;
+  }
+
+  function renderProductSurfaceInfo(product) {
+    const surfaceInfos = Array.isArray(product.surfaceInfos)
+      ? product.surfaceInfos.filter((info) => info.description || normalizePreviewUrl(info.link))
+      : [];
+    if (surfaceInfos.length && (surfaceInfos.length > 1 || (product.mountingSurfaces || []).length > 1)) {
+      return `
+        <div class="product-surface-info">
+          ${surfaceInfos.map(renderProductSurfaceInfoItem).join("")}
+        </div>
+      `;
+    }
+
+    const description = String(product.surfaceDescription || "").trim();
+    const link = normalizePreviewUrl(product.surfaceLink);
+    if (!description && !link) return "";
+
+    return `
+      <div class="product-surface-info">
+        ${description ? `<div class="product-description">${formatDescription(description)}</div>` : ""}
+        ${link ? renderOpenGraphPreviewShell(link) : ""}
+      </div>
+    `;
+  }
+
+  function renderProductSurfaceInfoItem(info) {
+    const surface = String(info.surface || "").trim();
+    const description = String(info.description || "").trim();
+    const link = normalizePreviewUrl(info.link);
+
+    return `
+      <div class="product-surface-detail">
+        ${surface ? `<div class="product-surface-label">${escapeHtml(surface)}</div>` : ""}
+        ${description ? `<div class="product-description">${formatDescription(description)}</div>` : ""}
+        ${link ? renderOpenGraphPreviewShell(link) : ""}
+      </div>
+    `;
+  }
+
+  function renderOpenGraphPreviewShell(url) {
+    return `
+      <a class="og-preview" href="${escapeHtml(url)}" target="_blank" rel="noopener" data-og-preview-url="${escapeHtml(url)}">
+        ${renderOpenGraphPreviewContent(buildFallbackLinkPreview(url))}
+      </a>
+    `;
+  }
+
+  function hydrateOpenGraphPreviews() {
+    const cards = Array.from(ui.selectorSurvey.querySelectorAll("[data-og-preview-url]"));
+    cards.forEach((card) => {
+      const url = card.dataset.ogPreviewUrl;
+      fetchOpenGraphPreview(url).then((preview) => {
+        if (!preview || !card.isConnected || card.dataset.ogPreviewUrl !== url) return;
+        card.innerHTML = renderOpenGraphPreviewContent(preview);
+      });
+    });
+  }
+
+  async function fetchOpenGraphPreview(url) {
+    try {
+      const response = await fetch(`/.netlify/functions/open-graph?url=${encodeURIComponent(url)}`, {
+        cache: "force-cache"
+      });
+      if (!response.ok) return null;
+      const preview = await response.json();
+      return normalizeOpenGraphPreview(preview, url);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function normalizeOpenGraphPreview(preview, fallbackUrl) {
+    if (!preview || typeof preview !== "object") return null;
+    const fallback = buildFallbackLinkPreview(fallbackUrl);
+    const url = normalizePreviewUrl(preview.url) || fallback.url;
+    return {
+      url,
+      title: String(preview.title || fallback.title || "").trim(),
+      description: String(preview.description || fallback.description || "").trim(),
+      siteName: String(preview.siteName || fallback.siteName || "").trim(),
+      image: normalizePreviewUrl(preview.image) || fallback.image
+    };
+  }
+
+  function renderOpenGraphPreviewContent(preview) {
+    const image = preview.image
+      ? `<span class="og-preview-media"><img src="${escapeHtml(preview.image)}" alt=""></span>`
+      : `<span class="og-preview-media fallback">${escapeHtml(getHostInitial(preview.siteName || preview.url))}</span>`;
+    const description = preview.description
+      ? `<span class="og-preview-description">${escapeHtml(preview.description)}</span>`
+      : "";
+
+    return `
+      ${image}
+      <span class="og-preview-body">
+        <span class="og-preview-site">${escapeHtml(preview.siteName || getReadableHost(preview.url))}</span>
+        <span class="og-preview-title">${escapeHtml(preview.title || preview.url)}</span>
+        ${description}
+      </span>
+    `;
+  }
+
+  function buildFallbackLinkPreview(url) {
+    const parsed = safeParseUrl(url);
+    const youtubeId = parsed ? getYouTubeVideoId(parsed) : "";
+    const title = youtubeId ? "YouTube video" : getReadableUrlTitle(parsed);
+    return {
+      url,
+      title,
+      description: parsed ? getReadableHost(parsed.href) : url,
+      siteName: youtubeId ? "YouTube" : getReadableHost(parsed ? parsed.href : url),
+      image: youtubeId ? `https://img.youtube.com/vi/${encodeURIComponent(youtubeId)}/hqdefault.jpg` : ""
+    };
+  }
+
+  function normalizePreviewUrl(value) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const withProtocol = /^[a-z][a-z\d+.-]*:/i.test(text) ? text : `https://${text}`;
+    const parsed = safeParseUrl(withProtocol);
+    if (!parsed || !/^https?:$/.test(parsed.protocol)) return "";
+    return parsed.href;
+  }
+
+  function safeParseUrl(value) {
+    try {
+      return new URL(value, window.location.href);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function getYouTubeVideoId(url) {
+    const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+    if (host === "youtu.be") {
+      return url.pathname.split("/").filter(Boolean)[0] || "";
+    }
+    if (host.endsWith("youtube.com")) {
+      if (url.pathname === "/watch") return url.searchParams.get("v") || "";
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (["embed", "shorts", "live"].includes(parts[0])) return parts[1] || "";
+    }
+    return "";
+  }
+
+  function getReadableUrlTitle(url) {
+    if (!url) return "Linked resource";
+    const parts = url.pathname.split("/").filter(Boolean);
+    const slug = parts[parts.length - 1] || url.hostname;
+    return decodeURIComponent(slug)
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim() || "Linked resource";
+  }
+
+  function getReadableHost(url) {
+    const parsed = typeof url === "string" ? safeParseUrl(url) : url;
+    return parsed ? parsed.hostname.replace(/^www\./i, "") : "";
+  }
+
+  function getHostInitial(value) {
+    return String(value || "Link").trim().charAt(0).toUpperCase() || "L";
+  }
+
+  function formatDescription(value) {
+    return escapeHtml(value).replace(/\r?\n/g, "<br>");
   }
 
   function getSelectorEmptyMessage(selectorState) {
@@ -2335,7 +2963,6 @@
               <div class="artwork-crop-stage" data-artwork-crop-stage data-artwork-id="${artworkId}">
                 <div class="artwork-crop-frame" data-artwork-crop-frame data-artwork-id="${artworkId}" data-crop-aspect="${cropAspect}" style="${cropFrameStyle}">
                   <img class="artwork-crop-image" data-artwork-crop-image src="${escapeHtml(artwork.dataUrl)}" alt="" draggable="false" style="${imageStyle}">
-                  <div class="artwork-crop-grid" aria-hidden="true"></div>
                   ${panelGuides}
                   <button class="artwork-scale-handle" type="button" data-artwork-crop-scale aria-label="Scale image" title="Scale image"></button>
                 </div>
@@ -2441,8 +3068,8 @@
       <p>Do you want to save stock by offsetting the panel joins?</p>
       <div class="muted">${escapeHtml(active)} Potential saving: ${formatNumber(savingM, 2)} linear metres.</div>
       <div class="prompt-actions">
-        <button class="primary-button compact" type="button" data-offset-choice="yes">Use offset joins</button>
-        <button class="ghost-button compact" type="button" data-offset-choice="no">Keep even joins</button>
+        <button class="offset-choice-button compact${state.useOffsetJoins === true ? " selected" : ""}" type="button" data-offset-choice="yes" aria-pressed="${state.useOffsetJoins === true ? "true" : "false"}">Use offset joins</button>
+        <button class="offset-choice-button compact${state.useOffsetJoins === true ? "" : " selected"}" type="button" data-offset-choice="no" aria-pressed="${state.useOffsetJoins === true ? "false" : "true"}">Keep even joins</button>
       </div>
     `;
   }
@@ -2456,7 +3083,7 @@
         : "No saving";
       return `
         <tr${selected}>
-          <td>${formatInteger(option.roll.width)} mm</td>
+          <td>${escapeHtml(formatRollWidthLabel(option.roll))}</td>
           <td>${formatInteger(option.joins)}</td>
           <td>${formatNumber(option.evenPack.lengthMm / 1000, 2)} m</td>
           <td>${offsetText}</td>
@@ -2576,6 +3203,8 @@
     }
 
     const stockWidth = best.roll.width;
+    const printableWidth = Math.max(1, cleanNumber(best.roll.printableWidth, stockWidth));
+    const printableOffsetMm = Math.max(0, (stockWidth - printableWidth) / 2);
     const lengthMm = Math.max(pack.lengthMm, 1);
     const preview = Boolean(options.preview);
     const maxWidthPx = preview ? 640 : 1400;
@@ -2594,7 +3223,7 @@
     const clipDefs = [];
 
     const rects = placements.map((placement, placementIndex) => {
-      const x = pad + placement.x * scale;
+      const x = pad + (printableOffsetMm + placement.x) * scale;
       const y = titleHeight + placement.y * scale;
       const width = Math.max(1, placement.width * scale);
       const height = Math.max(1, placement.height * scale);
@@ -2778,7 +3407,15 @@
 
   function formatRollLabel(roll) {
     const qcode = roll.qcode ? ` · ${roll.qcode}` : "";
-    return `${formatInteger(roll.width)} mm${qcode}`;
+    return `${formatRollWidthLabel(roll)}${qcode}`;
+  }
+
+  function formatRollWidthLabel(roll) {
+    const printableWidth = Number.isFinite(roll.printableWidth) ? roll.printableWidth : getPrintableRollWidth(roll);
+    if (Math.abs(printableWidth - roll.width) > 0.001) {
+      return `${formatInteger(roll.width)} mm (${formatInteger(printableWidth)} printable)`;
+    }
+    return `${formatInteger(roll.width)} mm`;
   }
 
   function escapeHtml(value) {
@@ -2796,6 +3433,7 @@
 
   window.RollStockCalculator = {
     parseElements,
+    parseConfigCsv,
     parseSelectorCsv,
     evaluateRoll,
     buildCartUrl,
