@@ -4,31 +4,22 @@
   const APP_MODES = {
     live: {
       title: "SAV Builder-Live",
-      background: "#ffffff",
-      sheetCsvUrl: "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/gviz/tq?tqx=out:csv&sheet=Selector",
-      sheetGvizUrl: "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/gviz/tq?sheet=Selector",
-      configCsvUrl: "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/gviz/tq?tqx=out:csv&sheet=Config",
-      configGvizUrl: "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/gviz/tq?sheet=Config",
-      sheetEditUrl: "https://docs.google.com/spreadsheets/d/1Ai-RT9p7H73pg07j8cmpDfIIwIo8NnS-gzypc3Kg5x0/edit?usp=sharing"
+      background: "#ffffff"
     },
     dev: {
       title: "SAV Builder DEV",
-      background: "#fff8df",
-      sheetCsvUrl: "https://docs.google.com/spreadsheets/d/1Y6dRHL8FKb1DNZL0JWP7kJsf7DOFJd5ZhyXCHrXH_SU/gviz/tq?tqx=out:csv&gid=1922651000",
-      sheetGvizUrl: "https://docs.google.com/spreadsheets/d/1Y6dRHL8FKb1DNZL0JWP7kJsf7DOFJd5ZhyXCHrXH_SU/gviz/tq?gid=1922651000",
-      configCsvUrl: "https://docs.google.com/spreadsheets/d/1Y6dRHL8FKb1DNZL0JWP7kJsf7DOFJd5ZhyXCHrXH_SU/gviz/tq?tqx=out:csv&sheet=Config",
-      configGvizUrl: "https://docs.google.com/spreadsheets/d/1Y6dRHL8FKb1DNZL0JWP7kJsf7DOFJd5ZhyXCHrXH_SU/gviz/tq?sheet=Config",
-      sheetEditUrl: "https://docs.google.com/spreadsheets/d/1Y6dRHL8FKb1DNZL0JWP7kJsf7DOFJd5ZhyXCHrXH_SU/edit?usp=sharing"
+      background: "#fff8df"
     }
   };
   const APP_MODE = getAppMode();
   const APP_CONFIG = APP_MODES[APP_MODE];
-  const SHEET_CSV_URL = APP_CONFIG.sheetCsvUrl;
-  const SHEET_GVIZ_URL = APP_CONFIG.sheetGvizUrl;
-  const CONFIG_CSV_URL = APP_CONFIG.configCsvUrl;
-  const CONFIG_GVIZ_URL = APP_CONFIG.configGvizUrl;
-  const SHEET_EDIT_URL = APP_CONFIG.sheetEditUrl;
-  const SHEET_OPEN_PASSWORD = "1958-1960";
+  const APP_SCRIPT_ELEMENT = document.currentScript;
+  const APPS_SCRIPT_WEB_APP_URL = String(
+    window.SAV_BUILDER_APPS_SCRIPT_URL ||
+    APP_SCRIPT_ELEMENT?.dataset?.appsScriptUrl ||
+    document.querySelector("meta[name='sav-builder-apps-script-url']")?.content ||
+    ""
+  ).trim();
 
   const TILE_OFFSET_MM = 5;
   const MATERIAL_LOADING_MM = 500;
@@ -502,14 +493,25 @@
     recalcTimer = window.setTimeout(recalculate, 130);
   }
 
-  function openGSheetWithPassword() {
-    const password = window.prompt("Enter password to open the GSheet");
-    if (password == null) return;
-    if (password.trim() !== SHEET_OPEN_PASSWORD) {
-      window.alert("Incorrect password.");
+  async function openGSheetWithPassword() {
+    if (!isAppsScriptConfigured()) {
+      window.alert("Apps Script is not configured yet.");
       return;
     }
-    window.open(SHEET_EDIT_URL, "_blank", "noopener");
+
+    const password = window.prompt("Enter password to open the GSheet");
+    if (password == null) return;
+
+    try {
+      const payload = await loadAppsScriptPayload({
+        action: "openSheet",
+        password: password.trim()
+      });
+      if (!payload.url) throw new Error("No sheet URL was returned.");
+      window.open(payload.url, "_blank", "noopener");
+    } catch (error) {
+      window.alert(error.message || "Could not open the GSheet.");
+    }
   }
 
   function setElementInputMode(mode) {
@@ -811,17 +813,11 @@
     ui.sheetStatus.textContent = "Selector: loading";
     await refreshPricingConfig();
     try {
-      const selectorData = await loadSelectorFromGviz();
+      const selectorData = await loadSelectorFromAppsScript();
       if (!selectorData.rows.length) throw new Error("No selector rows in sheet");
-      applySelectorData(selectorData, "live");
+      applySelectorData(selectorData, "apps-script");
     } catch (error) {
-      try {
-        const selectorData = await loadSelectorFromCsvExport();
-        if (!selectorData.rows.length) throw new Error("No selector rows in CSV export");
-        applySelectorData(selectorData, "live");
-      } catch (fallbackError) {
-        applySelectorData(parseSelectorCsv(FALLBACK_SELECTOR_CSV), "fallback");
-      }
+      applySelectorData(parseSelectorCsv(FALLBACK_SELECTOR_CSV), "fallback");
     }
 
     recalculate();
@@ -829,36 +825,52 @@
 
   async function refreshPricingConfig() {
     state.pricingConfig = { ...DEFAULT_PRICING_CONFIG };
-    if (!CONFIG_GVIZ_URL && !CONFIG_CSV_URL) return;
+    if (!isAppsScriptConfigured()) return;
 
     try {
-      const config = await loadConfigFromGviz();
+      const config = await loadConfigFromAppsScript();
       state.pricingConfig = {
         ...DEFAULT_PRICING_CONFIG,
         ...config
       };
     } catch (error) {
-      try {
-        const response = await fetch(`${CONFIG_CSV_URL}&_=${Date.now()}`, { cache: "reload" });
-        if (!response.ok) throw new Error("Config request failed");
-        state.pricingConfig = {
-          ...DEFAULT_PRICING_CONFIG,
-          ...parseConfigCsv(await response.text())
-        };
-      } catch (fallbackError) {
-        state.pricingConfig = { ...DEFAULT_PRICING_CONFIG };
-      }
+      state.pricingConfig = { ...DEFAULT_PRICING_CONFIG };
     }
   }
 
-  function loadConfigFromGviz() {
+  function isAppsScriptConfigured() {
+    return /^https:\/\/script\.google\.com\/macros\/s\//i.test(APPS_SCRIPT_WEB_APP_URL);
+  }
+
+  async function loadConfigFromAppsScript() {
+    const payload = await loadAppsScriptPayload({ sheet: "Config" });
+    return parseConfigRows(getAppsScriptRows(payload));
+  }
+
+  async function loadSelectorFromAppsScript() {
+    const payload = await loadAppsScriptPayload({ sheet: "Selector" });
+    return parseSelectorRows(getAppsScriptRows(payload));
+  }
+
+  function getAppsScriptRows(payload) {
+    if (!payload || !Array.isArray(payload.values)) return [];
+    return payload.values.map((row) =>
+      Array.isArray(row) ? row.map((cell) => String(cell ?? "").trim()) : []
+    );
+  }
+
+  function loadAppsScriptPayload(params = {}) {
+    if (!isAppsScriptConfigured()) {
+      return Promise.reject(new Error("Apps Script is not configured."));
+    }
+
     return new Promise((resolve, reject) => {
-      const callbackName = `__rollStockConfig${Date.now()}${Math.floor(Math.random() * 10000)}`;
+      const callbackName = `__savBuilderAppsScript${Date.now()}${Math.floor(Math.random() * 10000)}`;
       const script = document.createElement("script");
       const timeout = window.setTimeout(() => {
         cleanup();
-        reject(new Error("Config JSONP timed out"));
-      }, 5000);
+        reject(new Error("Apps Script request timed out."));
+      }, 10000);
 
       function cleanup() {
         window.clearTimeout(timeout);
@@ -868,59 +880,28 @@
 
       window[callbackName] = (payload) => {
         cleanup();
-        try {
-          resolve(parseConfigGviz(payload));
-        } catch (error) {
-          reject(error);
+        if (!payload || payload.ok === false) {
+          reject(new Error(payload?.error || "Apps Script request failed."));
+          return;
         }
+        resolve(payload);
       };
 
       script.onerror = () => {
         cleanup();
-        reject(new Error("Config JSONP failed"));
+        reject(new Error("Apps Script request failed."));
       };
 
-      script.src = `${CONFIG_GVIZ_URL}&tqx=out:json;responseHandler:${callbackName}&_=${Date.now()}`;
-      document.head.appendChild(script);
-    });
-  }
-
-  async function loadSelectorFromCsvExport() {
-    const response = await fetch(`${SHEET_CSV_URL}&_=${Date.now()}`, { cache: "reload" });
-    if (!response.ok) throw new Error("Sheet request failed");
-    return parseSelectorCsv(await response.text());
-  }
-
-  function loadSelectorFromGviz() {
-    return new Promise((resolve, reject) => {
-      const callbackName = `__rollStockSheet${Date.now()}${Math.floor(Math.random() * 10000)}`;
-      const script = document.createElement("script");
-      const timeout = window.setTimeout(() => {
-        cleanup();
-        reject(new Error("Sheet JSONP timed out"));
-      }, 5000);
-
-      function cleanup() {
-        window.clearTimeout(timeout);
-        delete window[callbackName];
-        script.remove();
-      }
-
-      window[callbackName] = (payload) => {
-        cleanup();
-        try {
-          resolve(parseSelectorGviz(payload));
-        } catch (error) {
-          reject(error);
-        }
-      };
-
-      script.onerror = () => {
-        cleanup();
-        reject(new Error("Sheet JSONP failed"));
-      };
-
-      script.src = `${SHEET_GVIZ_URL}&tqx=out:json;responseHandler:${callbackName}&_=${Date.now()}`;
+      const url = new URL(APPS_SCRIPT_WEB_APP_URL);
+      Object.entries({
+        ...params,
+        mode: APP_MODE,
+        callback: callbackName,
+        _: Date.now()
+      }).forEach(([key, value]) => {
+        if (value != null && value !== "") url.searchParams.set(key, value);
+      });
+      script.src = url.toString();
       document.head.appendChild(script);
     });
   }
@@ -933,7 +914,7 @@
     state.productSearchSelection = null;
     validateSelectorSelections();
     renderBrandSelector();
-    ui.sheetStatus.textContent = source === "live" ? "Selector: live" : "Selector: fallback";
+    ui.sheetStatus.textContent = source === "apps-script" ? "Selector: Apps Script" : "Selector: fallback";
   }
 
   function recalculate() {
@@ -2046,16 +2027,6 @@
     return parseConfigRows(rows);
   }
 
-  function parseConfigGviz(payload) {
-    const tableRows = payload && payload.table && Array.isArray(payload.table.rows)
-      ? payload.table.rows
-      : [];
-    const rows = tableRows.map((row) =>
-      (row.c || []).map((cell) => (cell && cell.v != null ? cell.v : ""))
-    );
-    return parseConfigRows(rows);
-  }
-
   function parseConfigRows(rows) {
     const config = {};
     rows.forEach((row) => {
@@ -2122,24 +2093,13 @@
     return key === "m" || key === "metre" || key === "metres" || key === "meter" || key === "meters";
   }
 
-  function parseSelectorGviz(payload) {
-    const headers = payload && payload.table && Array.isArray(payload.table.cols)
-      ? payload.table.cols.map((column) => String(column.label || column.id || "").trim())
-      : [];
-    const tableRows = payload && payload.table && Array.isArray(payload.table.rows)
-      ? payload.table.rows
-      : [];
-    const rows = tableRows.map((row) =>
-      (row.c || []).map((cell) => (cell && cell.v != null ? cell.v : ""))
-    );
-    return parseSelectorRows(headers.length ? [headers, ...rows] : rows);
-  }
-
   function parseSelectorRows(rows) {
     if (!rows.length) return { rows: [], selectorColumns: [] };
     const headers = rows[0].map((header) => String(header || "").trim());
+    const metadataHeaders = getSurfaceMetadataHeaderRow(rows);
+    const dataRows = metadataHeaders.length ? rows.slice(2) : rows.slice(1);
     const productIndex = findHeaderIndex(headers, "Product");
-    const mountingSurfaceMatrixColumns = getMountingSurfaceMatrixColumns(rows, headers, productIndex);
+    const mountingSurfaceMatrixColumns = getMountingSurfaceMatrixColumns(dataRows, headers, metadataHeaders, productIndex);
     const hasMountingSurfaceMatrix = mountingSurfaceMatrixColumns.length > 0;
     const mountingSurfaceMatrixHeaderSet = new Set(mountingSurfaceMatrixColumns.map((column) => column.header));
     let baseSelectorColumns = headers
@@ -2161,7 +2121,7 @@
       : [];
     const perforationColumn = baseSelectorColumns.find(isPerforationColumnName);
 
-    const selectorRows = rows.slice(1).flatMap((row) => {
+    const selectorRows = dataRows.flatMap((row) => {
       const data = {};
       headers.forEach((header, index) => {
         if (header) data[header] = String(row[index] ?? "").trim();
@@ -2181,15 +2141,21 @@
     return { rows: selectorRows, selectorColumns, postProductSelectorColumns };
   }
 
-  function getMountingSurfaceMatrixColumns(rows, headers, productIndex) {
+  function getSurfaceMetadataHeaderRow(rows) {
+    const candidate = rows[1];
+    if (!candidate || !candidate.some((cell) => isSurfaceMetadataColumnName(cell))) return [];
+    return candidate.map((header) => String(header || "").trim());
+  }
+
+  function getMountingSurfaceMatrixColumns(rows, headers, metadataHeaders, productIndex) {
     const startIndex = getMountingSurfaceMatrixStartIndex(rows, headers);
     const boundary = getMountingSurfaceMatrixBoundary(headers, productIndex, startIndex);
 
     return headers.slice(startIndex, boundary)
       .map((header, offset) => {
         const index = startIndex + offset;
-        const descriptionIndex = getSurfaceMetadataIndex(headers, index, "description");
-        const linkIndex = getSurfaceMetadataIndex(headers, index, "link");
+        const descriptionIndex = getSurfaceMetadataIndex(headers, metadataHeaders, index, "description");
+        const linkIndex = getSurfaceMetadataIndex(headers, metadataHeaders, index, "link");
         return { header, index, descriptionIndex, linkIndex };
       })
       .filter((column) => column.header)
@@ -2228,14 +2194,16 @@
       }));
   }
 
-  function getSurfaceMetadataIndex(headers, surfaceIndex, type) {
+  function getSurfaceMetadataIndex(headers, metadataHeaders, surfaceIndex, type) {
     const isExpectedHeader = type === "description" ? isSurfaceDescriptionColumnName : isSurfaceLinkColumnName;
     const rightOffset = type === "description" ? 1 : 2;
     const leftOffset = type === "description" ? -2 : -1;
     const rightIndex = surfaceIndex + rightOffset;
     const leftIndex = surfaceIndex + leftOffset;
     if (isExpectedHeader(headers[rightIndex])) return rightIndex;
+    if (isExpectedHeader(metadataHeaders[rightIndex])) return rightIndex;
     if (isExpectedHeader(headers[leftIndex])) return leftIndex;
+    if (isExpectedHeader(metadataHeaders[leftIndex])) return leftIndex;
     return -1;
   }
 
