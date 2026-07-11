@@ -2749,6 +2749,8 @@
   }
 
   function renderOpenGraphPreviewShell(url) {
+    if (isDirectImageUrl(url)) return renderImagePreviewShell(url);
+
     return `
       <a class="og-preview" href="${escapeHtml(url)}" target="_blank" rel="noopener" data-og-preview-url="${escapeHtml(url)}">
         ${renderOpenGraphPreviewContent(buildFallbackLinkPreview(url))}
@@ -2756,14 +2758,66 @@
     `;
   }
 
+  function renderImagePreviewShell(url) {
+    return `
+      <a class="og-preview image-preview" href="${escapeHtml(url)}" target="_blank" rel="noopener">
+        ${renderImagePreviewContent(url)}
+      </a>
+    `;
+  }
+
+  function renderImagePreviewContent(url) {
+    const parsed = safeParseUrl(url);
+    const title = getReadableUrlTitle(parsed);
+    const host = getReadableHost(parsed);
+    return `
+      <span class="image-preview-media">
+        <img src="${escapeHtml(url)}" alt="${escapeHtml(title)}" loading="lazy">
+      </span>
+      <span class="image-preview-caption">
+        <span class="og-preview-site">${escapeHtml(host || "Image")}</span>
+        <span class="og-preview-title">${escapeHtml(title || "Linked image")}</span>
+      </span>
+    `;
+  }
+
   function hydrateOpenGraphPreviews() {
     const cards = Array.from(ui.selectorSurvey.querySelectorAll("[data-og-preview-url]"));
     cards.forEach((card) => {
       const url = card.dataset.ogPreviewUrl;
-      fetchOpenGraphPreview(url).then((preview) => {
-        if (!preview || !card.isConnected || card.dataset.ogPreviewUrl !== url) return;
-        card.innerHTML = renderOpenGraphPreviewContent(preview);
-      });
+      hydrateLinkPreview(card, url);
+    });
+  }
+
+  async function hydrateLinkPreview(card, url) {
+    if (await canLoadImageUrl(url)) {
+      if (!card.isConnected || card.dataset.ogPreviewUrl !== url) return;
+      card.classList.add("image-preview");
+      delete card.dataset.ogPreviewUrl;
+      card.innerHTML = renderImagePreviewContent(url);
+      return;
+    }
+
+    const preview = await fetchOpenGraphPreview(url);
+    if (!preview || !card.isConnected || card.dataset.ogPreviewUrl !== url) return;
+    card.innerHTML = renderOpenGraphPreviewContent(preview);
+  }
+
+  function canLoadImageUrl(url) {
+    return new Promise((resolve) => {
+      const image = new Image();
+      const timeout = window.setTimeout(() => settle(false), 4500);
+
+      function settle(value) {
+        window.clearTimeout(timeout);
+        image.onload = null;
+        image.onerror = null;
+        resolve(value);
+      }
+
+      image.onload = () => settle(true);
+      image.onerror = () => settle(false);
+      image.src = url;
     });
   }
 
@@ -2831,6 +2885,12 @@
     const parsed = safeParseUrl(withProtocol);
     if (!parsed || !/^https?:$/.test(parsed.protocol)) return "";
     return parsed.href;
+  }
+
+  function isDirectImageUrl(value) {
+    const parsed = safeParseUrl(value);
+    if (!parsed || !/^https?:$/.test(parsed.protocol)) return false;
+    return /\.(avif|bmp|gif|jpe?g|png|svg|webp)$/i.test(parsed.pathname);
   }
 
   function safeParseUrl(value) {
@@ -3224,7 +3284,7 @@
           <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="3" fill="none" stroke="#17201c" stroke-opacity="0.35" stroke-width="1"/>
           ${overlapLine}
           ${labelPlate}
-          ${canLabel ? `<text x="${x + 6}" y="${y + 16}" fill="#ffffff" font-size="12" font-family="Segoe UI, Arial, sans-serif">${escapeSvg(label)}</text>` : ""}
+          ${canLabel ? `<text x="${x + 6}" y="${y + 16}" fill="#ffffff" font-size="12" font-family="Open Sans, Cabin">${escapeSvg(label)}</text>` : ""}
         </g>
       `;
     }).join("");
@@ -3233,19 +3293,19 @@
     const rollHeight = drawingHeight;
     const metreMarks = buildMetreMarks(lengthMm, scale, pad, titleHeight, drawingWidth);
     const truncatedNote = pack.truncated
-      ? `<text x="${pad}" y="${svgHeight - 12}" fill="#5e6a64" font-size="12" font-family="Segoe UI, Arial, sans-serif">Preview capped at ${pack.placements.length} of ${pack.totalPieces} print pieces.</text>`
+      ? `<text x="${pad}" y="${svgHeight - 12}" fill="#5e6a64" font-size="12" font-family="Open Sans, Cabin">Preview capped at ${pack.placements.length} of ${pack.totalPieces} print pieces.</text>`
       : "";
 
     return `
       <svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" role="img" aria-label="Roll imposition">
         <rect width="100%" height="100%" fill="#fbfcfa"/>
-        <text x="${pad}" y="24" fill="#17201c" font-size="${preview ? 16 : 22}" font-weight="700" font-family="Segoe UI, Arial, sans-serif">${escapeSvg(title)}</text>
-        <text x="${pad}" y="${preview ? 42 : 47}" fill="#5e6a64" font-size="12" font-family="Segoe UI, Arial, sans-serif">Strategy: ${escapeSvg(getStrategyLabel(pack.strategy))} | Joins: ${formatInteger(best.joins)} | Total: ${escapeSvg(formatMoney(best.costs.total))}</text>
+        <text x="${pad}" y="24" fill="#17201c" font-size="${preview ? 16 : 22}" font-weight="700" font-family="Open Sans, Cabin">${escapeSvg(title)}</text>
+        <text x="${pad}" y="${preview ? 42 : 47}" fill="#5e6a64" font-size="12" font-family="Open Sans, Cabin">Strategy: ${escapeSvg(getStrategyLabel(pack.strategy))} | Joins: ${formatInteger(best.joins)} | Total: ${escapeSvg(formatMoney(best.costs.total))}</text>
         <defs>${clipDefs.join("")}</defs>
         <rect x="${pad}" y="${rollY}" width="${drawingWidth}" height="${rollHeight}" fill="#ffffff" stroke="#17201c" stroke-width="1.4"/>
         ${metreMarks}
         ${rects}
-        <text x="${pad + drawingWidth + 8}" y="${rollY + 14}" fill="#5e6a64" font-size="11" font-family="Segoe UI, Arial, sans-serif">${formatInteger(stockWidth)} mm</text>
+        <text x="${pad + drawingWidth + 8}" y="${rollY + 14}" fill="#5e6a64" font-size="11" font-family="Open Sans, Cabin">${formatInteger(stockWidth)} mm</text>
         ${truncatedNote}
       </svg>
     `;
@@ -3328,7 +3388,7 @@
       const y = titleHeight + metre * 1000 * scale;
       marks.push(`
         <line x1="${pad}" y1="${y}" x2="${pad + drawingWidth}" y2="${y}" stroke="#d9dfda" stroke-width="1"/>
-        <text x="${pad - 8}" y="${y + 4}" text-anchor="end" fill="#5e6a64" font-size="10" font-family="Segoe UI, Arial, sans-serif">${metre}m</text>
+        <text x="${pad - 8}" y="${y + 4}" text-anchor="end" fill="#5e6a64" font-size="10" font-family="Open Sans, Cabin">${metre}m</text>
       `);
     }
     return marks.join("");
