@@ -400,7 +400,7 @@
       syncJobInputFromElementTable();
       recalculate();
       const lastRow = ui.elementRowsBody.lastElementChild;
-      lastRow?.querySelector("[data-element-field='shortname']")?.focus();
+      lastRow?.querySelector("[data-element-field='quantity']")?.focus();
     });
 
     ui.artworkUpload.addEventListener("change", async () => {
@@ -673,10 +673,10 @@
   function renderElementTableRow(row) {
     return `
       <tr>
-        <td><input data-element-field="shortname" aria-label="Shortname" value="${escapeHtml(row.shortname)}"></td>
         <td><input data-element-field="quantity" aria-label="Quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}"></td>
         <td><input data-element-field="width" aria-label="Width" type="number" min="0" step="1" value="${escapeHtml(row.width)}"></td>
         <td><input data-element-field="height" aria-label="Height" type="number" min="0" step="1" value="${escapeHtml(row.height)}"></td>
+        <td><input data-element-field="shortname" aria-label="Shortname" value="${escapeHtml(row.shortname)}"></td>
         <td>
           <button class="ghost-button compact icon-button" type="button" data-remove-element-row aria-label="Remove row">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -729,7 +729,7 @@
       ? []
       : getElementTableRows();
     const startRow = currentRows.length ? Array.from(ui.elementRowsBody.children).indexOf(input.closest("tr")) : 0;
-    const fieldOrder = ["shortname", "quantity", "width", "height"];
+    const fieldOrder = ["quantity", "width", "height", "shortname"];
     const startField = currentRows.length ? Math.max(0, fieldOrder.indexOf(input.dataset.elementField)) : 0;
 
     pastedRows.forEach((pastedRow, pastedIndex) => {
@@ -750,7 +750,7 @@
 
   function shouldReplaceElementTableFromPaste(input, pastedRows) {
     const firstRow = ui.elementRowsBody.querySelector("tr");
-    const firstField = firstRow?.querySelector("[data-element-field='shortname']");
+    const firstField = firstRow?.querySelector("[data-element-field='quantity']");
     const startsAtFirstCell = input === firstField;
     const isRange = pastedRows.length > 1 || pastedRows.some((row) => row.length > 1);
     return startsAtFirstCell && isRange;
