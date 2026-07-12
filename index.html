@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SAV Builder-Live</title>
-    <link rel="stylesheet" href="styles.css?v=open-sans-blue-pills-20260712">
+    <link rel="stylesheet" href="styles.css?v=reset-blue-20260712">
   </head>
   <body>
     <header class="app-header">
@@ -50,9 +50,28 @@
           <div id="product-search-results" class="product-search-results" aria-live="polite"></div>
         </div>
 
+        <div class="setup-reset-row">
+          <button class="ghost-button compact setup-reset-button" id="reset-survey" type="button">Reset survey</button>
+        </div>
+
         <div class="brand-filter" aria-labelledby="brand-filter-title">
           <span id="brand-filter-title">Brand</span>
           <div id="brand-selector" class="brand-selector" role="radiogroup" aria-label="Brand filter"></div>
+        </div>
+
+        <div class="class-filter" aria-labelledby="class-filter-title">
+          <span id="class-filter-title">Class</span>
+          <div id="class-selector" class="class-selector" role="radiogroup" aria-label="Class filter"></div>
+        </div>
+
+        <div class="limit-filter" aria-labelledby="limit-filter-title">
+          <span id="limit-filter-title">Limit to:</span>
+          <div id="limit-selector" class="limit-selector" aria-label="Product property filters"></div>
+        </div>
+
+        <div class="mounting-filter" aria-labelledby="mounting-filter-title">
+          <span id="mounting-filter-title">Mounting Surface</span>
+          <div id="mounting-surface-selector" class="mounting-surface-selector" role="radiogroup" aria-label="Mounting surface filter"></div>
         </div>
 
         <div id="selector-survey" class="selector-survey"></div>
@@ -236,7 +255,7 @@
     <script src="pdfjs/pdf.classic.js"></script>
     <script src="pdfjs/pdf.worker.classic.js"></script>
     <script
-      src="app.js?v=open-sans-blue-pills-20260712"
+      src="app.js?v=print-mode-surface-control-20260712"
       data-apps-script-url="https://script.google.com/macros/s/AKfycbx_jQXFd-p0vFseuUzI7dxTfLOZFJWKD5JZb66QfCj8UCLHe645027F95PVK7ktYHC1/exec"
     ></script>
   </body>

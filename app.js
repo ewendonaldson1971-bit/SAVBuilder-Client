@@ -47,8 +47,31 @@
     { id: "orafol", label: "Orafol", matches: ["Orafol"], logo: "assets/brands/orafol.svg?v=2" },
     { id: "3m", label: "3M", matches: ["3M"], logo: "assets/brands/3m.png?v=2" }
   ];
+  const CLASS_COLUMN = "Class";
+  const CLASS_COLUMN_CANDIDATES = ["Class", "Product Class", "Material Class", "Vinyl Class"];
+  const CLASS_OPTIONS = [
+    { id: "all", label: "All", matches: [] },
+    { id: "monomeric", label: "Monomeric (Good)", matches: ["Monomeric", "Mono"] },
+    { id: "polymeric", label: "Polymeric (Better)", matches: ["Polymeric", "Poly"] },
+    { id: "cast", label: "Cast (Best)", matches: ["Cast"] }
+  ];
+  const LIMIT_FILTER_OPTIONS = [
+    { id: "air-release", label: "Air Release", columns: ["Air Release"] },
+    { id: "repositionable", label: "Repositionable on Install", columns: ["Repositionable on Install", "Repositionable on Installation", "Repositionable"] },
+    { id: "removable", label: "Removable", columns: ["Removable"] },
+    { id: "high-tac", label: "High-tac", columns: ["High-tac", "High tac", "High tack"] },
+    { id: "greyback", label: "Greyback", columns: ["Greyback", "Grey back", "Grayback", "Gray back"] },
+    { id: "translucent", label: "Translucent", columns: ["Translucent"] },
+    { id: "clear", label: "Clear", columns: ["Clear"] },
+    { id: "optically-clear", label: "Optically Clear", columns: ["Optically Clear"] },
+    { id: "perforated", label: "Perforated", columns: ["Perforated"] }
+  ];
+  const MOUNTING_SURFACE_ALL = "all";
   const MOUNTING_SURFACE_COLUMN = "Mounting Surface";
+  const PRINT_MODE_MOUNTING_SURFACES = ["Glass", "Acrylic"];
   const LEGACY_SURFACE_COLUMN = "Surface";
+  const TYPE_COLUMN = "Type";
+  const LONGEVITY_COLUMN = "Longevity";
   const SURFACE_DESCRIPTION_COLUMN = "Surface Description";
   const SURFACE_LINK_COLUMN = "Surface Link";
   const DERIVED_PERFORATION_COLUMN = "Perforation";
@@ -113,6 +136,9 @@
     selectorSelections: {},
     pricingConfig: { ...DEFAULT_PRICING_CONFIG },
     brandFilter: "all",
+    classFilter: "all",
+    limitFilters: new Set(),
+    mountingSurfaceFilter: MOUNTING_SURFACE_ALL,
     selectedProduct: null,
     productSearchQuery: "",
     productSearchResults: [],
@@ -148,6 +174,9 @@
     ui.jobInput.value = "";
     renderElementTableFromText();
     renderBrandSelector();
+    renderClassSelector();
+    renderLimitFilters();
+    renderMountingSurfaceSelector();
     attachEvents();
     recalculate();
     refreshProducts();
@@ -157,6 +186,10 @@
     ui.selectorSurvey = document.getElementById("selector-survey");
     ui.appTitle = document.getElementById("app-title");
     ui.brandSelector = document.getElementById("brand-selector");
+    ui.classSelector = document.getElementById("class-selector");
+    ui.limitSelector = document.getElementById("limit-selector");
+    ui.mountingSurfaceSelector = document.getElementById("mounting-surface-selector");
+    ui.resetSurvey = document.getElementById("reset-survey");
     ui.productSearch = document.getElementById("product-search");
     ui.productSearchResults = document.getElementById("product-search-results");
     ui.sheetStatus = document.getElementById("sheet-status");
@@ -211,17 +244,69 @@
       applyProductSearchSelection(Number.parseInt(result.dataset.productSearchIndex, 10));
     });
 
+    ui.resetSurvey.addEventListener("click", resetSurveyAndFilters);
+
     ui.brandSelector.addEventListener("click", (event) => {
       const button = event.target.closest("[data-brand-filter]");
       if (!button) return;
       const brandFilter = button.dataset.brandFilter;
       if (!getBrandOption(brandFilter) || state.brandFilter === brandFilter) return;
       state.brandFilter = brandFilter;
-      state.selectorSelections = {};
       state.productSearchSelection = null;
       state.productSearchQuery = "";
       ui.productSearch.value = "";
+      validateMountingSurfaceFilter();
+      validateSelectorSelections();
       renderBrandSelector();
+      renderMountingSurfaceSelector();
+      recalculate();
+    });
+
+    ui.classSelector.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-class-filter]");
+      if (!button) return;
+      const classFilter = button.dataset.classFilter;
+      if (!getClassOption(classFilter) || state.classFilter === classFilter) return;
+      state.classFilter = classFilter;
+      state.productSearchSelection = null;
+      state.productSearchQuery = "";
+      ui.productSearch.value = "";
+      validateMountingSurfaceFilter();
+      validateSelectorSelections();
+      renderClassSelector();
+      renderMountingSurfaceSelector();
+      recalculate();
+    });
+
+    ui.limitSelector.addEventListener("change", (event) => {
+      const checkbox = event.target.closest("[data-limit-filter]");
+      if (!checkbox) return;
+      const limitFilter = checkbox.dataset.limitFilter;
+      if (!getLimitFilterOption(limitFilter)) return;
+      if (checkbox.checked) {
+        state.limitFilters.add(limitFilter);
+      } else {
+        state.limitFilters.delete(limitFilter);
+      }
+      state.productSearchSelection = null;
+      state.productSearchQuery = "";
+      ui.productSearch.value = "";
+      validateMountingSurfaceFilter();
+      validateSelectorSelections();
+      renderLimitFilters();
+      renderMountingSurfaceSelector();
+      recalculate();
+    });
+
+    ui.mountingSurfaceSelector.addEventListener("change", (event) => {
+      const input = event.target.closest("[data-mounting-surface-filter]");
+      if (!input) return;
+      state.mountingSurfaceFilter = input.value || MOUNTING_SURFACE_ALL;
+      state.productSearchSelection = null;
+      state.productSearchQuery = "";
+      ui.productSearch.value = "";
+      validateSelectorSelections();
+      renderMountingSurfaceSelector();
       recalculate();
     });
 
@@ -233,9 +318,7 @@
       const back = event.target.closest("[data-selector-back]");
 
       if (reset) {
-        state.selectorSelections = {};
-        state.productSearchSelection = null;
-        recalculate();
+        resetSurveyAndFilters();
         return;
       }
 
@@ -347,6 +430,22 @@
 
     ui.downloadImposition.addEventListener("click", downloadImposition);
     ui.addAllCart.addEventListener("click", addAllToCart);
+  }
+
+  function resetSurveyAndFilters() {
+    state.selectorSelections = {};
+    state.brandFilter = "all";
+    state.classFilter = "all";
+    state.limitFilters.clear();
+    state.mountingSurfaceFilter = MOUNTING_SURFACE_ALL;
+    state.productSearchSelection = null;
+    state.productSearchQuery = "";
+    ui.productSearch.value = "";
+    renderBrandSelector();
+    renderClassSelector();
+    renderLimitFilters();
+    renderMountingSurfaceSelector();
+    recalculate();
   }
 
   function handleArtworkCropClick(event) {
@@ -912,8 +1011,12 @@
     state.postProductSelectorColumns = selectorData.postProductSelectorColumns || [];
     state.productSource = source;
     state.productSearchSelection = null;
+    validateMountingSurfaceFilter();
     validateSelectorSelections();
     renderBrandSelector();
+    renderClassSelector();
+    renderLimitFilters();
+    renderMountingSurfaceSelector();
     ui.sheetStatus.textContent = source === "apps-script" ? "Selector: Apps Script" : "Selector: fallback";
   }
 
@@ -993,7 +1096,7 @@
     const rows = selection.rows.filter((row) =>
       state.selectorRows.includes(row) &&
       row.isCompleteProduct &&
-      matchesSelectedBrand(row)
+      matchesSelectedFilters(row)
     );
     if (!rows.length) {
       state.productSearchSelection = null;
@@ -1047,7 +1150,7 @@
 
     state.selectorRows.forEach((row, index) => {
       if (!row.isCompleteProduct || !row.Product) return;
-      if (!matchesSelectedBrand(row)) return;
+      if (!matchesSelectedFilters(row)) return;
       const haystack = getProductSearchHaystack(row);
       if (!terms.every((term) => matchesProductSearchTerm(haystack, term))) return;
 
@@ -1072,10 +1175,9 @@
       row.Product,
       row[BRAND_COLUMN],
       row.Laminate,
-      row["Internal/External"],
       row.Type,
       row[DERIVED_PERFORATION_COLUMN],
-      row.Longevity,
+      row[LONGEVITY_COLUMN],
       getRollWidthLabels(row).join("|"),
       getRollQCodes(row).join("|")
     ].map((value) => String(value || "").trim()).join("\u001f");
@@ -1113,14 +1215,14 @@
   function getProductSearchMeta(result) {
     const row = result.row || result;
     const surfaces = getProductSearchSurfaces(result);
+    const surfaceLabels = surfaces.map((surface) => getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, surface));
     const parts = [
       row[BRAND_COLUMN] ? `Brand: ${row[BRAND_COLUMN]}` : "",
       row.Laminate ? `Laminate: ${row.Laminate}` : "",
-      surfaces.length ? `${surfaces.length === 1 ? "Mounting surface" : "Mounting surfaces"}: ${surfaces.join(", ")}` : "",
-      row["Internal/External"],
+      surfaceLabels.length ? `${surfaceLabels.length === 1 ? "Mounting surface" : "Mounting surfaces"}: ${surfaceLabels.join(", ")}` : "",
       row.Type,
       row[DERIVED_PERFORATION_COLUMN],
-      row.Longevity
+      row[LONGEVITY_COLUMN]
     ].filter(Boolean);
     const widths = row.rolls && row.rolls.length
       ? getRollWidthLabels(row).join(", ")
@@ -1189,7 +1291,7 @@
 
   function getCandidateSelectorRows(selections) {
     return state.selectorRows.filter((row) =>
-      matchesSelectedBrand(row) &&
+      matchesSelectedFilters(row) &&
       Object.entries(selections).every(([column, value]) => !value || String(row[column] || "") === value)
     );
   }
@@ -1197,7 +1299,7 @@
   function getProductSearchPathEntries(product) {
     const selections = product.selectorSelections || {};
     return getSelectorSelectionOrder()
-      .filter((column) => column !== MOUNTING_SURFACE_COLUMN && selections[column])
+      .filter((column) => column !== MOUNTING_SURFACE_COLUMN && shouldShowSelectorColumn(column) && selections[column])
       .map((column) => ({ column, value: selections[column], inferred: false }));
   }
 
@@ -1217,8 +1319,69 @@
     }).join("");
   }
 
-  function matchesSelectedBrand(row) {
-    return matchesBrandOption(row, getBrandOption(state.brandFilter));
+  function renderClassSelector() {
+    if (!ui.classSelector) return;
+    ui.classSelector.innerHTML = CLASS_OPTIONS.map((option) => {
+      const selected = option.id === state.classFilter;
+      return `
+        <button class="class-button${selected ? " selected" : ""}" type="button" data-class-filter="${escapeHtml(option.id)}" role="radio" aria-checked="${selected ? "true" : "false"}">
+          <span>${escapeHtml(option.label)}</span>
+        </button>
+      `;
+    }).join("");
+  }
+
+  function renderLimitFilters() {
+    if (!ui.limitSelector) return;
+    ui.limitSelector.innerHTML = LIMIT_FILTER_OPTIONS.map((option) => {
+      const checked = state.limitFilters.has(option.id);
+      return `
+        <label class="limit-option${checked ? " selected" : ""}">
+          <input type="checkbox" data-limit-filter="${escapeHtml(option.id)}" ${checked ? "checked" : ""}>
+          <span>${escapeHtml(option.label)}</span>
+        </label>
+      `;
+    }).join("");
+  }
+
+  function renderMountingSurfaceSelector() {
+    if (!ui.mountingSurfaceSelector) return;
+    const choices = getAvailableMountingSurfaceChoices();
+    const options = [
+      { value: MOUNTING_SURFACE_ALL, label: "All" },
+      ...choices.map((choice) => ({
+        value: choice,
+        label: getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, choice)
+      }))
+    ];
+
+    ui.mountingSurfaceSelector.innerHTML = options.map((option) => {
+      const checked = option.value === state.mountingSurfaceFilter;
+      return `
+        <label class="mounting-option${checked ? " selected" : ""}">
+          <input type="radio" name="mounting-surface-filter" value="${escapeHtml(option.value)}" data-mounting-surface-filter="${escapeHtml(option.value)}" ${checked ? "checked" : ""}>
+          <span>${escapeHtml(option.label)}</span>
+        </label>
+      `;
+    }).join("");
+  }
+
+  function getAvailableMountingSurfaceChoices() {
+    return getDistinctValues(
+      state.selectorRows.filter((row) => row.isCompleteProduct && matchesBaseFilters(row)),
+      MOUNTING_SURFACE_COLUMN
+    );
+  }
+
+  function matchesSelectedFilters(row) {
+    return matchesBaseFilters(row) &&
+      matchesMountingSurfaceFilter(row);
+  }
+
+  function matchesBaseFilters(row) {
+    return matchesBrandOption(row, getBrandOption(state.brandFilter)) &&
+      matchesClassOption(row, getClassOption(state.classFilter)) &&
+      matchesLimitFilters(row);
   }
 
   function matchesBrandOption(row, option) {
@@ -1227,14 +1390,97 @@
     return Boolean(brandKey) && option.matches.some((match) => brandKey.includes(normalizeKey(match)));
   }
 
+  function matchesClassOption(row, option) {
+    if (!option || option.id === "all") return true;
+    const classKey = normalizeKey(getClassFilterText(row));
+    return Boolean(classKey) && option.matches.some((match) => classKey.includes(normalizeKey(match)));
+  }
+
+  function matchesLimitFilters(row) {
+    if (!state.limitFilters.size) return true;
+    return Array.from(state.limitFilters).every((filterId) =>
+      matchesLimitFilterOption(row, getLimitFilterOption(filterId))
+    );
+  }
+
+  function matchesLimitFilterOption(row, option) {
+    if (!option) return true;
+    return option.columns.some((column) => isTrueFilterCell(getRowValueForColumn(row, column)));
+  }
+
+  function matchesMountingSurfaceFilter(row) {
+    if (!state.mountingSurfaceFilter || state.mountingSurfaceFilter === MOUNTING_SURFACE_ALL) return true;
+    return String(row[MOUNTING_SURFACE_COLUMN] || "").trim() === state.mountingSurfaceFilter;
+  }
+
+  function validateMountingSurfaceFilter() {
+    if (!state.mountingSurfaceFilter || state.mountingSurfaceFilter === MOUNTING_SURFACE_ALL) return;
+    const choices = getAvailableMountingSurfaceChoices();
+    if (!choices.includes(state.mountingSurfaceFilter)) {
+      state.mountingSurfaceFilter = MOUNTING_SURFACE_ALL;
+    }
+  }
+
+  function getRowValueForColumn(row, column) {
+    const key = normalizeKey(column);
+    const header = Object.keys(row).find((candidate) => normalizeKey(candidate) === key);
+    return header ? row[header] : "";
+  }
+
+  function getClassFilterText(row) {
+    const explicitClass = CLASS_COLUMN_CANDIDATES
+      .map((column) => String(row[column] || "").trim())
+      .find(Boolean);
+    if (explicitClass) return explicitClass;
+    return [
+      row.Product,
+      row.Laminate,
+      row.Type
+    ].filter(Boolean).join(" ");
+  }
+
   function getBrandOption(id) {
     return BRAND_OPTIONS.find((option) => option.id === id) || BRAND_OPTIONS[0];
+  }
+
+  function getClassOption(id) {
+    return CLASS_OPTIONS.find((option) => option.id === id) || CLASS_OPTIONS[0];
+  }
+
+  function getLimitFilterOption(id) {
+    return LIMIT_FILTER_OPTIONS.find((option) => option.id === id) || null;
+  }
+
+  function getDisplaySelectorColumn(column) {
+    return String(column || "");
+  }
+
+  function getDisplaySelectorValue(column, value) {
+    return String(value || "").trim();
+  }
+
+  function shouldShowSelectorColumn(column) {
+    if (isPerforationColumnName(column)) return state.limitFilters.has("perforated");
+    if (isPrintModeColumnName(column)) return isPrintModeControlActive();
+    return true;
+  }
+
+  function isPrintModeControlActive() {
+    return state.limitFilters.has("clear") ||
+      state.limitFilters.has("translucent") ||
+      isPrintModeMountingSurfaceActive();
+  }
+
+  function isPrintModeMountingSurfaceActive() {
+    const key = normalizeKey(state.mountingSurfaceFilter);
+    return PRINT_MODE_MOUNTING_SURFACES.some((surface) => key === normalizeKey(surface));
   }
 
   function getSelectorPathEntries(selections, candidates, question) {
     const entries = [];
 
     for (const column of state.selectorColumns) {
+      if (!shouldShowSelectorColumn(column)) continue;
       if (selections[column]) {
         entries.push({ column, value: selections[column], inferred: false });
         continue;
@@ -1257,6 +1503,7 @@
     }
 
     for (const column of state.postProductSelectorColumns) {
+      if (!shouldShowSelectorColumn(column)) continue;
       if (selections[column]) {
         entries.push({ column, value: selections[column], inferred: false });
         continue;
@@ -1273,18 +1520,8 @@
   }
 
   function getNextSelectorQuestion(candidates, selections) {
-    if (state.selectorColumns[0] === MOUNTING_SURFACE_COLUMN && !selections[MOUNTING_SURFACE_COLUMN]) {
-      const mountingSurfaceChoices = getDistinctValues(candidates, MOUNTING_SURFACE_COLUMN);
-      if (mountingSurfaceChoices.length) {
-        return {
-          column: MOUNTING_SURFACE_COLUMN,
-          label: MOUNTING_SURFACE_COLUMN,
-          choices: mountingSurfaceChoices
-        };
-      }
-    }
-
     for (const column of state.selectorColumns) {
+      if (!shouldShowSelectorColumn(column)) continue;
       if (selections[column]) continue;
       const choices = getDistinctValues(candidates, column);
       if (choices.length > 1) {
@@ -1300,6 +1537,7 @@
     }
 
     for (const column of state.postProductSelectorColumns) {
+      if (!shouldShowSelectorColumn(column)) continue;
       if (selections[column]) continue;
       const choices = getDistinctValues(candidates, column);
       if (choices.length > 1) {
@@ -1344,6 +1582,7 @@
     const surfaceDescription = surfaceInfos.length === 1 ? surfaceInfos[0].description : "";
     const surfaceLink = surfaceInfos.length === 1 ? surfaceInfos[0].link : "";
     const mountingSurfaces = getDistinctValues(productRows, MOUNTING_SURFACE_COLUMN);
+    const longevities = getDistinctValues(productRows, LONGEVITY_COLUMN);
 
     return {
       name: productName.trim(),
@@ -1353,6 +1592,7 @@
       surfaceLink,
       surfaceInfos,
       mountingSurfaces,
+      longevities,
       selectorRow: productRows[0],
       selectorSelections: { ...selections }
     };
@@ -1396,6 +1636,7 @@
   function validateSelectorSelections() {
     const validated = {};
     getSelectorSelectionOrder().forEach((column) => {
+      if (!shouldShowSelectorColumn(column)) return;
       if (!state.selectorSelections[column]) return;
       const testSelections = { ...validated, [column]: state.selectorSelections[column] };
       if (getCandidateSelectorRows(testSelections).length) {
@@ -2105,16 +2346,21 @@
     let baseSelectorColumns = headers
       .slice(0, productIndex >= 0 ? productIndex : headers.length)
       .filter((header) => !isBrandColumnName(header))
+      .filter((header) => !isClassColumnName(header))
+      .filter((header) => !isLimitFilterColumnName(header))
+      .filter((header) => !isLegacySurfaceSideColumn(header))
+      .filter((header) => !isWizardExcludedColumnName(header))
       .filter((header) => !isSurfaceMetadataColumnName(header))
       .filter((header) => !mountingSurfaceMatrixHeaderSet.has(header))
       .filter((header) => !hasMountingSurfaceMatrix || !isMatrixReplacedSelectorColumn(header))
       .filter(Boolean);
-    if (hasMountingSurfaceMatrix) {
-      baseSelectorColumns = [MOUNTING_SURFACE_COLUMN, ...baseSelectorColumns];
-    }
     const postProductSelectorColumns = productIndex >= 0
       ? headers.slice(productIndex + 1)
         .filter((header) => !isBrandColumnName(header))
+        .filter((header) => !isClassColumnName(header))
+        .filter((header) => !isLimitFilterColumnName(header))
+        .filter((header) => !isLegacySurfaceSideColumn(header))
+        .filter((header) => !isWizardExcludedColumnName(header))
         .filter((header) => !isSurfaceMetadataColumnName(header))
         .filter((header) => header && isPostProductSelectorColumn(header))
         .filter((header) => !hasMountingSurfaceMatrix || !isMatrixReplacedSelectorColumn(header))
@@ -2165,6 +2411,7 @@
   function getMountingSurfaceMatrixStartIndex(rows, headers) {
     const firstHeader = headers[0];
     if (!isMatrixReplacedSelectorColumn(firstHeader)) return 0;
+    if (headers[1] && !isMatrixBoundarySelectorColumn(headers[1])) return 1;
     const firstColumnHasTrue = rows.slice(1).some((row) => isTrueCell(row[0]));
     return firstColumnHasTrue ? 0 : 1;
   }
@@ -2254,6 +2501,11 @@
     return String(value ?? "").trim().toLowerCase() === "true";
   }
 
+  function isTrueFilterCell(value) {
+    const key = normalizeKey(value);
+    return key === "true" || key === "yes" || key === "y" || key === "1" || key === "x";
+  }
+
   function isMatrixReplacedSelectorColumn(header) {
     const key = normalizeKey(header);
     return key === normalizeKey(LEGACY_SURFACE_COLUMN) || key === normalizeKey(MOUNTING_SURFACE_COLUMN);
@@ -2263,12 +2515,13 @@
     const key = normalizeKey(header);
     return key === normalizeKey(LEGACY_SURFACE_COLUMN) ||
       key === normalizeKey(MOUNTING_SURFACE_COLUMN) ||
-      key === "internalexternal" ||
+      isLegacySurfaceSideColumn(header) ||
       key === "type" ||
       key === "printmode" ||
       key === "longevity" ||
       key === "laminate" ||
       isBrandColumnName(header) ||
+      isLimitFilterColumnName(header) ||
       isPerforationColumnName(header) ||
       isRollWidthColumnName(header) ||
       isProductCostColumnName(header) ||
@@ -2283,12 +2536,39 @@
       !isProductCostColumnName(header) &&
       !isLaminateCostColumnName(header) &&
       !isQCodeColumnName(header) &&
+      !isLimitFilterColumnName(header) &&
+      !isLegacySurfaceSideColumn(header) &&
       !isIgnoredSelectorDataColumn(header) &&
       !isPrintRateColumnName(header);
   }
 
   function isBrandColumnName(header) {
     return normalizeKey(header) === normalizeKey(BRAND_COLUMN);
+  }
+
+  function isClassColumnName(header) {
+    const key = normalizeKey(header);
+    return CLASS_COLUMN_CANDIDATES.some((column) => key === normalizeKey(column));
+  }
+
+  function isLimitFilterColumnName(header) {
+    const key = normalizeKey(header);
+    return LIMIT_FILTER_OPTIONS.some((option) =>
+      option.columns.some((column) => key === normalizeKey(column))
+    );
+  }
+
+  function isLegacySurfaceSideColumn(header) {
+    const key = normalizeKey(header);
+    return key === "internalexternal" || key === "firstsurfacesecondsurface";
+  }
+
+  function isWizardExcludedColumnName(header) {
+    const key = normalizeKey(header);
+    return key === normalizeKey(LEGACY_SURFACE_COLUMN) ||
+      key === normalizeKey(MOUNTING_SURFACE_COLUMN) ||
+      key === normalizeKey(TYPE_COLUMN) ||
+      key === normalizeKey(LONGEVITY_COLUMN);
   }
 
   function isSurfaceMetadataColumnName(header) {
@@ -2393,6 +2673,10 @@
 
   function isPrintRateColumnName(column) {
     return normalizeKey(column) === "printsqmrate" || normalizeKey(column) === "printpersqm";
+  }
+
+  function isPrintModeColumnName(column) {
+    return normalizeKey(column) === "printmode";
   }
 
   function isQCodeColumnName(column) {
@@ -2663,15 +2947,19 @@
   function renderSelectorSurvey(selectorState) {
     const path = selectorState.pathEntries
       .filter((entry) => entry.value)
-      .map((entry) => `<span class="survey-pill${entry.inferred ? " inferred" : ""}">${escapeHtml(entry.column)}: ${escapeHtml(entry.value)}</span>`)
+      .map((entry) => {
+        const column = getDisplaySelectorColumn(entry.column);
+        const value = getDisplaySelectorValue(entry.column, entry.value);
+        return `<span class="survey-pill${entry.inferred ? " inferred" : ""}">${escapeHtml(column)}: ${escapeHtml(value)}</span>`;
+      })
       .join("");
 
     const questionMarkup = selectorState.question ? `
       <div class="survey-question">
-        <strong>${escapeHtml(selectorState.question.label)}</strong>
+        <strong>${escapeHtml(getDisplaySelectorColumn(selectorState.question.label))}</strong>
         <div class="choice-grid">
           ${selectorState.question.choices.map((choice) => `
-            <button class="choice-button" type="button" data-selector-column="${escapeHtml(selectorState.question.column)}" data-selector-value="${escapeHtml(choice)}">${escapeHtml(choice)}</button>
+            <button class="choice-button" type="button" data-selector-column="${escapeHtml(selectorState.question.column)}" data-selector-value="${escapeHtml(choice)}">${escapeHtml(getDisplaySelectorValue(selectorState.question.column, choice))}</button>
           `).join("")}
         </div>
       </div>
@@ -2682,6 +2970,7 @@
       <div class="selected-product">
         <strong>${escapeHtml(product.name)}</strong>
         <div class="muted">${escapeHtml(product.rolls.map(formatRollLabel).join(" | "))}</div>
+        ${renderProductLongevity(product)}
         ${renderProductMountingSurfaces(product)}
         ${renderProductSurfaceInfo(product)}
       </div>
@@ -2690,7 +2979,6 @@
     const resetMarkup = Object.keys(selectorState.selections).length ? `
       <div class="survey-actions">
         <button class="ghost-button compact" type="button" data-selector-back="true">Back</button>
-        <button class="ghost-button compact" type="button" data-selector-reset="true">Reset survey</button>
       </div>
     ` : "";
 
@@ -2707,7 +2995,17 @@
     const surfaces = Array.isArray(product.mountingSurfaces) ? product.mountingSurfaces : [];
     if (!surfaces.length) return "";
     const label = surfaces.length === 1 ? "Mounting surface" : "Mounting surfaces";
-    return `<div class="muted">${escapeHtml(`${label}: ${surfaces.join(", ")}`)}</div>`;
+    const surfaceLabels = surfaces.map((surface) => getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, surface));
+    return `<div class="muted">${escapeHtml(`${label}: ${surfaceLabels.join(", ")}`)}</div>`;
+  }
+
+  function renderProductLongevity(product) {
+    const longevities = Array.isArray(product.longevities)
+      ? product.longevities.filter(Boolean)
+      : [];
+    if (!longevities.length) return "";
+    const label = longevities.length === 1 ? "Longevity" : "Longevities";
+    return `<div class="muted">${escapeHtml(`${label}: ${longevities.join(", ")}`)}</div>`;
   }
 
   function renderProductSurfaceInfo(product) {
@@ -2736,12 +3034,13 @@
 
   function renderProductSurfaceInfoItem(info) {
     const surface = String(info.surface || "").trim();
+    const surfaceLabel = getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, surface);
     const description = String(info.description || "").trim();
     const link = normalizePreviewUrl(info.link);
 
     return `
       <div class="product-surface-detail">
-        ${surface ? `<div class="product-surface-label">${escapeHtml(surface)}</div>` : ""}
+        ${surfaceLabel ? `<div class="product-surface-label">${escapeHtml(surfaceLabel)}</div>` : ""}
         ${description ? `<div class="product-description">${formatDescription(description)}</div>` : ""}
         ${link ? renderOpenGraphPreviewShell(link) : ""}
       </div>
