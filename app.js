@@ -38,7 +38,12 @@
     stockMultiplier: STOCK_MULTIPLIER,
     laminateMultiplier: LAMINATE_MULTIPLIER,
     printPerSqm: PRINT_PER_SQM,
-    unitPrice: UNIT_PRICE
+    unitPrice: UNIT_PRICE,
+    printModes: {
+      clear: [],
+      translucent: [],
+      standard: []
+    }
   });
   const BRAND_COLUMN = "Brand";
   const BRAND_OPTIONS = [
@@ -56,6 +61,7 @@
     { id: "cast", label: "Cast (Best)", matches: ["Cast"] }
   ];
   const LIMIT_FILTER_OPTIONS = [
+    { id: "white", label: "White", columns: ["White"] },
     { id: "air-release", label: "Air Release", columns: ["Air Release"] },
     { id: "repositionable", label: "Repositionable on Install", columns: ["Repositionable on Install", "Repositionable on Installation", "Repositionable"] },
     { id: "removable", label: "Removable", columns: ["Removable"] },
@@ -64,14 +70,15 @@
     { id: "translucent", label: "Translucent", columns: ["Translucent"] },
     { id: "clear", label: "Clear", columns: ["Clear"] },
     { id: "optically-clear", label: "Optically Clear", columns: ["Optically Clear"] },
-    { id: "perforated", label: "Perforated", columns: ["Perforated"] }
+    { id: "perforated", label: "Perforated (One Way Vision)", columns: ["Perforated", "Perforated (One way Vision)", "Perforated (One Way Vision)"] }
   ];
   const MOUNTING_SURFACE_ALL = "all";
   const MOUNTING_SURFACE_COLUMN = "Mounting Surface";
-  const PRINT_MODE_MOUNTING_SURFACES = ["Glass", "Acrylic"];
   const LEGACY_SURFACE_COLUMN = "Surface";
   const TYPE_COLUMN = "Type";
   const LONGEVITY_COLUMN = "Longevity";
+  const LAMINATE_COLUMN = "Laminate";
+  const PRINT_MODE_COLUMN = "Print Mode";
   const SURFACE_DESCRIPTION_COLUMN = "Surface Description";
   const SURFACE_LINK_COLUMN = "Surface Link";
   const DERIVED_PERFORATION_COLUMN = "Perforation";
@@ -333,7 +340,11 @@
       state.productSearchSelection = null;
       const column = choice.dataset.selectorColumn;
       state.selectorSelections[column] = choice.dataset.selectorValue;
-      pruneSelectionsAfter(column);
+      if (choice.dataset.selectorPreserveAfter === "true") {
+        validateSelectorSelections();
+      } else {
+        pruneSelectionsAfter(column);
+      }
       recalculate();
     });
 
@@ -1105,6 +1116,19 @@
 
     const selections = { ...selection.selections };
     const productName = selection.productName || selections.Product || rows[0].Product;
+    const question = getPrintModeQuestion(rows, selections);
+    if (question) {
+      return {
+        selections,
+        pathEntries: getSelectorPathEntries(selections, rows, question),
+        candidates: rows,
+        question,
+        product: null,
+        hasRows: state.selectorRows.length > 0,
+        completeProductCount: rows.length
+      };
+    }
+
     const product = buildProductFromRows(rows, productName, selections);
     if (!product) return null;
 
@@ -1292,7 +1316,9 @@
   function getCandidateSelectorRows(selections) {
     return state.selectorRows.filter((row) =>
       matchesSelectedFilters(row) &&
-      Object.entries(selections).every(([column, value]) => !value || String(row[column] || "") === value)
+      Object.entries(selections).every(([column, value]) =>
+        isSyntheticSelectorColumn(column) || !value || String(row[column] || "") === value
+      )
     );
   }
 
@@ -1301,6 +1327,10 @@
     return getSelectorSelectionOrder()
       .filter((column) => column !== MOUNTING_SURFACE_COLUMN && shouldShowSelectorColumn(column) && selections[column])
       .map((column) => ({ column, value: selections[column], inferred: false }));
+  }
+
+  function isSyntheticSelectorColumn(column) {
+    return isPrintModeColumnName(column);
   }
 
   function renderBrandSelector() {
@@ -1461,19 +1491,8 @@
 
   function shouldShowSelectorColumn(column) {
     if (isPerforationColumnName(column)) return state.limitFilters.has("perforated");
-    if (isPrintModeColumnName(column)) return isPrintModeControlActive();
+    if (isPrintModeColumnName(column)) return true;
     return true;
-  }
-
-  function isPrintModeControlActive() {
-    return state.limitFilters.has("clear") ||
-      state.limitFilters.has("translucent") ||
-      isPrintModeMountingSurfaceActive();
-  }
-
-  function isPrintModeMountingSurfaceActive() {
-    const key = normalizeKey(state.mountingSurfaceFilter);
-    return PRINT_MODE_MOUNTING_SURFACES.some((surface) => key === normalizeKey(surface));
   }
 
   function getSelectorPathEntries(selections, candidates, question) {
@@ -1502,6 +1521,9 @@
       }
     }
 
+    const printModeEntry = getPrintModePathEntry(candidates, selections, question);
+    if (printModeEntry) entries.push(printModeEntry);
+
     for (const column of state.postProductSelectorColumns) {
       if (!shouldShowSelectorColumn(column)) continue;
       if (selections[column]) {
@@ -1523,29 +1545,62 @@
     for (const column of state.selectorColumns) {
       if (!shouldShowSelectorColumn(column)) continue;
       if (selections[column]) continue;
-      const choices = getDistinctValues(candidates, column);
+      const choices = getSortedSelectorChoices(candidates, column);
       if (choices.length > 1) {
         return { column, label: column, choices };
       }
     }
 
     if (!selections.Product) {
-      const productChoices = getDistinctValues(candidates.filter((row) => row.isCompleteProduct), "Product");
+      const productChoices = getSortedSelectorChoices(candidates.filter((row) => row.isCompleteProduct), "Product");
       if (productChoices.length > 1) {
         return { column: "Product", label: "Product", choices: productChoices };
       }
     }
 
+    const printModeQuestion = getPrintModeQuestion(candidates, selections);
+    if (printModeQuestion) return printModeQuestion;
+
     for (const column of state.postProductSelectorColumns) {
       if (!shouldShowSelectorColumn(column)) continue;
       if (selections[column]) continue;
-      const choices = getDistinctValues(candidates, column);
+      const choices = getSortedSelectorChoices(candidates, column);
       if (choices.length > 1) {
         return { column, label: column, choices };
       }
     }
 
     return null;
+  }
+
+  function getPrintModeQuestion(candidates, selections) {
+    if (selections[PRINT_MODE_COLUMN]) return null;
+    const rows = getPrintModeCandidateRows(candidates, selections);
+    const choices = getPrintModeOptionsForRows(rows).map((option) => option.label);
+    return choices.length > 1
+      ? { column: PRINT_MODE_COLUMN, label: PRINT_MODE_COLUMN, choices }
+      : null;
+  }
+
+  function getPrintModePathEntry(candidates, selections, question) {
+    if (question && question.column === PRINT_MODE_COLUMN) return null;
+    const rows = getPrintModeCandidateRows(candidates, selections);
+    const options = getPrintModeOptionsForRows(rows);
+    if (selections[PRINT_MODE_COLUMN]) {
+      const selected = options.find((option) => normalizeKey(option.label) === normalizeKey(selections[PRINT_MODE_COLUMN]));
+      return selected ? { column: PRINT_MODE_COLUMN, value: selected.label, inferred: false } : null;
+    }
+    return options.length === 1
+      ? { column: PRINT_MODE_COLUMN, value: options[0].label, inferred: true }
+      : null;
+  }
+
+  function getPrintModeCandidateRows(candidates, selections) {
+    const completeRows = candidates.filter((row) => row.isCompleteProduct);
+    const productName = selections.Product || getSingleDistinctValue(completeRows, "Product");
+    return productName
+      ? completeRows.filter((row) => row.Product === productName)
+      : completeRows;
   }
 
   function buildSelectedProduct(candidates, selections) {
@@ -1577,22 +1632,28 @@
       });
     });
 
-    const printSqmRate = productRows.find((row) => Number.isFinite(row.printSqmRate))?.printSqmRate;
+    const printModeOption = getPrintModeOptionForSelection(productRows, selections[PRINT_MODE_COLUMN]) ||
+      getSinglePrintModeOption(productRows);
+    const printSqmRate = printModeOption?.rate ??
+      productRows.find((row) => Number.isFinite(row.printSqmRate))?.printSqmRate;
     const surfaceInfos = getProductSurfaceInfos(productRows);
     const surfaceDescription = surfaceInfos.length === 1 ? surfaceInfos[0].description : "";
     const surfaceLink = surfaceInfos.length === 1 ? surfaceInfos[0].link : "";
     const mountingSurfaces = getDistinctValues(productRows, MOUNTING_SURFACE_COLUMN);
     const longevities = getDistinctValues(productRows, LONGEVITY_COLUMN);
+    const laminates = getSortedSelectorChoices(productRows, LAMINATE_COLUMN);
 
     return {
       name: productName.trim(),
       rolls: Array.from(rollsByWidth.values()).sort((a, b) => a.width - b.width),
       printSqmRate,
+      printMode: printModeOption?.label || "",
       surfaceDescription,
       surfaceLink,
       surfaceInfos,
       mountingSurfaces,
       longevities,
+      laminates,
       selectorRow: productRows[0],
       selectorSelections: { ...selections }
     };
@@ -1618,6 +1679,88 @@
     return isPerforationColumnName(column) ? values.sort(comparePerforationChoices) : values;
   }
 
+  function getSortedSelectorChoices(rows, column) {
+    const values = getDistinctValues(rows, column);
+    if (column === "Product") return sortProductChoicesByCost(rows, values);
+    if (isLaminateColumnName(column)) return sortLaminateChoicesByCost(rows, values);
+    return values;
+  }
+
+  function sortProductChoicesByCost(rows, choices) {
+    return sortChoicesByCost(choices, (choice) =>
+      getMinimumRollCost(rows.filter((row) => row.Product === choice), "cost")
+    );
+  }
+
+  function sortLaminateChoicesByCost(rows, choices) {
+    return sortChoicesByCost(choices, (choice) =>
+      getMinimumRollCost(rows.filter((row) => String(row[LAMINATE_COLUMN] || "").trim() === choice), "laminateCost")
+    );
+  }
+
+  function sortChoicesByCost(choices, getCost) {
+    return choices.slice().sort((a, b) =>
+      compareNullableNumbers(getCost(a), getCost(b)) ||
+      String(a).localeCompare(String(b))
+    );
+  }
+
+  function getMinimumRollCost(rows, costKey) {
+    const costs = rows.flatMap((row) => Array.isArray(row.rolls)
+      ? row.rolls.map((roll) => cleanNumber(roll[costKey], NaN))
+      : []);
+    const finiteCosts = costs.filter((cost) => Number.isFinite(cost) && cost >= 0);
+    return finiteCosts.length ? Math.min(...finiteCosts) : NaN;
+  }
+
+  function compareNullableNumbers(a, b) {
+    const aFinite = Number.isFinite(a);
+    const bFinite = Number.isFinite(b);
+    if (aFinite && bFinite) return a - b;
+    if (aFinite) return -1;
+    if (bFinite) return 1;
+    return 0;
+  }
+
+  function getSingleDistinctValue(rows, column) {
+    const values = getDistinctValues(rows, column);
+    return values.length === 1 ? values[0] : "";
+  }
+
+  function getPrintModeOptionsForRows(rows) {
+    const config = state.pricingConfig || DEFAULT_PRICING_CONFIG;
+    const printModes = config.printModes || {};
+    const types = getPrintModeTypesForRows(rows);
+    const options = [];
+    types.forEach((type) => {
+      (printModes[type] || []).forEach((option) => addPrintModeOption(options, option.label, option.rate));
+    });
+    return options;
+  }
+
+  function getPrintModeTypesForRows(rows) {
+    if (!rows.length) return [];
+    if (rows.some((row) => isClearPrintModeRow(row))) return ["clear"];
+    if (rows.some((row) => isTrueFilterCell(getRowValueForColumn(row, "Translucent")))) return ["translucent"];
+    return ["standard"];
+  }
+
+  function isClearPrintModeRow(row) {
+    return isTrueFilterCell(getRowValueForColumn(row, "Clear")) ||
+      isTrueFilterCell(getRowValueForColumn(row, "Optically Clear"));
+  }
+
+  function getPrintModeOptionForSelection(rows, value) {
+    const key = normalizeKey(value);
+    if (!key) return null;
+    return getPrintModeOptionsForRows(rows).find((option) => normalizeKey(option.label) === key) || null;
+  }
+
+  function getSinglePrintModeOption(rows) {
+    const options = getPrintModeOptionsForRows(rows);
+    return options.length === 1 ? options[0] : null;
+  }
+
   function isMeaningfulSelectorValue(value) {
     const key = normalizeKey(value);
     return Boolean(key) && key !== "true" && key !== "false";
@@ -1638,6 +1781,13 @@
     getSelectorSelectionOrder().forEach((column) => {
       if (!shouldShowSelectorColumn(column)) return;
       if (!state.selectorSelections[column]) return;
+      if (isPrintModeColumnName(column)) {
+        const rows = getCandidateSelectorRows(validated);
+        if (getPrintModeOptionForSelection(rows, state.selectorSelections[column])) {
+          validated[column] = state.selectorSelections[column];
+        }
+        return;
+      }
       const testSelections = { ...validated, [column]: state.selectorSelections[column] };
       if (getCandidateSelectorRows(testSelections).length) {
         validated[column] = state.selectorSelections[column];
@@ -1658,7 +1808,7 @@
   }
 
   function getSelectorSelectionOrder() {
-    return [...state.selectorColumns, "Product", ...state.postProductSelectorColumns];
+    return [...state.selectorColumns, "Product", PRINT_MODE_COLUMN, ...state.postProductSelectorColumns];
   }
 
   function evaluateRoll(product, roll, elements, settings) {
@@ -1688,6 +1838,7 @@
     return {
       productName: product.name,
       printSqmRate: product.printSqmRate,
+      printMode: product.printMode,
       roll: pricedRoll,
       elementPlans,
       evenElementPlans,
@@ -2223,6 +2374,11 @@
     };
   }
 
+  function getEffectivePrintSqmRate(product) {
+    const config = state.pricingConfig || DEFAULT_PRICING_CONFIG;
+    return Number.isFinite(product?.printSqmRate) ? product.printSqmRate : config.printPerSqm;
+  }
+
   function parseElements(text) {
     const rows = parseDelimited(text);
     const elements = [];
@@ -2277,7 +2433,58 @@
       config[key] = normalizeConfigValue(key, value, row[2]);
     });
 
+    const printModes = parsePrintModeConfigRows(rows);
+    if (printModes.clear.length || printModes.translucent.length || printModes.standard.length) {
+      config.printModes = printModes;
+    }
+
     return config;
+  }
+
+  function parsePrintModeConfigRows(rows) {
+    const printModes = {
+      clear: [],
+      translucent: [],
+      standard: []
+    };
+
+    rows.forEach((row, rowIndex) => {
+      row.forEach((cell, columnIndex) => {
+        const type = getPrintModeConfigType(cell);
+        if (!type) return;
+        const rateColumnIndex = getPrintModeRateColumnIndex(row, columnIndex);
+        rows.slice(rowIndex + 1).forEach((modeRow) => {
+          const label = String(modeRow[columnIndex] || "").trim();
+          const rate = cleanNumber(modeRow[rateColumnIndex], NaN);
+          if (!label || !Number.isFinite(rate)) return;
+          addPrintModeOption(printModes[type], label, rate);
+        });
+      });
+    });
+
+    return printModes;
+  }
+
+  function getPrintModeConfigType(value) {
+    const key = normalizeKey(value);
+    if (!key.includes("printmode")) return "";
+    if (key.includes("translucent")) return "translucent";
+    if (key.includes("clear")) return "clear";
+    if (key.includes("standard")) return "standard";
+    return "";
+  }
+
+  function getPrintModeRateColumnIndex(row, printModeColumnIndex) {
+    const nextHeader = normalizeKey(row[printModeColumnIndex + 1]);
+    return nextHeader.includes("sqmrate") || nextHeader === "rate"
+      ? printModeColumnIndex + 1
+      : printModeColumnIndex + 1;
+  }
+
+  function addPrintModeOption(options, label, rate) {
+    const key = normalizeKey(label);
+    if (!key || options.some((option) => normalizeKey(option.label) === key)) return;
+    options.push({ label, rate });
   }
 
   function normalizeConfigValue(key, value, unit) {
@@ -2349,6 +2556,8 @@
       .filter((header) => !isClassColumnName(header))
       .filter((header) => !isLimitFilterColumnName(header))
       .filter((header) => !isLegacySurfaceSideColumn(header))
+      .filter((header) => !isPrintModeColumnName(header))
+      .filter((header) => !isPerforationColumnName(header))
       .filter((header) => !isWizardExcludedColumnName(header))
       .filter((header) => !isSurfaceMetadataColumnName(header))
       .filter((header) => !mountingSurfaceMatrixHeaderSet.has(header))
@@ -2360,6 +2569,8 @@
         .filter((header) => !isClassColumnName(header))
         .filter((header) => !isLimitFilterColumnName(header))
         .filter((header) => !isLegacySurfaceSideColumn(header))
+        .filter((header) => !isPrintModeColumnName(header))
+        .filter((header) => !isPerforationColumnName(header))
         .filter((header) => !isWizardExcludedColumnName(header))
         .filter((header) => !isSurfaceMetadataColumnName(header))
         .filter((header) => header && isPostProductSelectorColumn(header))
@@ -2493,7 +2704,7 @@
 
     data.rolls = extractRolls(data);
     data.printSqmRate = cleanNumber(data["Print SQM Rate"], NaN);
-    data.isCompleteProduct = Boolean(data.Product && data.rolls.length && Number.isFinite(data.printSqmRate));
+    data.isCompleteProduct = Boolean(data.Product && data.rolls.length);
     return data;
   }
 
@@ -2517,7 +2728,7 @@
       key === normalizeKey(MOUNTING_SURFACE_COLUMN) ||
       isLegacySurfaceSideColumn(header) ||
       key === "type" ||
-      key === "printmode" ||
+      isPrintModeColumnName(header) ||
       key === "longevity" ||
       key === "laminate" ||
       isBrandColumnName(header) ||
@@ -2538,6 +2749,8 @@
       !isQCodeColumnName(header) &&
       !isLimitFilterColumnName(header) &&
       !isLegacySurfaceSideColumn(header) &&
+      !isPrintModeColumnName(header) &&
+      !isPerforationColumnName(header) &&
       !isIgnoredSelectorDataColumn(header) &&
       !isPrintRateColumnName(header);
   }
@@ -2599,14 +2812,7 @@
   }
 
   function buildSelectorColumns(baseSelectorColumns, selectorRows, perforationColumn) {
-    if (perforationColumn || !selectorRows.some((row) => row[DERIVED_PERFORATION_COLUMN])) {
-      return baseSelectorColumns;
-    }
-
-    const selectorColumns = baseSelectorColumns.slice();
-    const typeIndex = selectorColumns.findIndex((column) => normalizeKey(column) === "type");
-    selectorColumns.splice(typeIndex >= 0 ? typeIndex + 1 : selectorColumns.length, 0, DERIVED_PERFORATION_COLUMN);
-    return selectorColumns;
+    return baseSelectorColumns.filter((column) => !isPerforationColumnName(column));
   }
 
   function extractPerforationValue(row) {
@@ -2676,7 +2882,11 @@
   }
 
   function isPrintModeColumnName(column) {
-    return normalizeKey(column) === "printmode";
+    return normalizeKey(column) === normalizeKey(PRINT_MODE_COLUMN);
+  }
+
+  function isLaminateColumnName(column) {
+    return normalizeKey(column) === normalizeKey(LAMINATE_COLUMN);
   }
 
   function isQCodeColumnName(column) {
@@ -2903,7 +3113,7 @@
     ui.metricPrice.textContent = "$0.00";
     ui.metricRate.textContent = "$0.00 / sqm";
     if (ui.printRateConstant) {
-      ui.printRateConstant.textContent = state.selectedProduct ? `${formatMoney(state.selectedProduct.printSqmRate)} / sqm` : "Select product";
+      ui.printRateConstant.textContent = state.selectedProduct ? `${formatMoney(getEffectivePrintSqmRate(state.selectedProduct))} / sqm` : "Select product";
     }
     ui.costBreakdown.innerHTML = "";
     ui.offsetPrompt.classList.add("hidden");
@@ -2954,22 +3164,19 @@
       })
       .join("");
 
-    const questionMarkup = selectorState.question ? `
-      <div class="survey-question">
-        <strong>${escapeHtml(getDisplaySelectorColumn(selectorState.question.label))}</strong>
-        <div class="choice-grid">
-          ${selectorState.question.choices.map((choice) => `
-            <button class="choice-button" type="button" data-selector-column="${escapeHtml(selectorState.question.column)}" data-selector-value="${escapeHtml(choice)}">${escapeHtml(getDisplaySelectorValue(selectorState.question.column, choice))}</button>
-          `).join("")}
-        </div>
-      </div>
-    ` : "";
+    const nestedProductQuestion = getNestedProductQuestion(selectorState);
+    const questionMarkup = selectorState.question && !nestedProductQuestion
+      ? renderSelectorQuestion(selectorState.question)
+      : "";
 
     const product = selectorState.product;
+    const productBrowseMarkup = renderProductBrowseChoices(selectorState, nestedProductQuestion);
     const productMarkup = product ? `
       <div class="selected-product">
         <strong>${escapeHtml(product.name)}</strong>
         <div class="muted">${escapeHtml(product.rolls.map(formatRollLabel).join(" | "))}</div>
+        ${renderProductLaminate(product)}
+        ${renderProductPrintMode(product)}
         ${renderProductLongevity(product)}
         ${renderProductMountingSurfaces(product)}
         ${renderProductSurfaceInfo(product)}
@@ -2985,10 +3192,95 @@
     ui.selectorSurvey.innerHTML = `
       ${path ? `<div class="survey-path">${path}</div>` : ""}
       ${questionMarkup}
+      ${productBrowseMarkup}
       ${productMarkup}
       ${resetMarkup}
     `;
     hydrateOpenGraphPreviews();
+  }
+
+  function renderSelectorQuestion(question) {
+    return `
+      <div class="survey-question">
+        <strong>${escapeHtml(getDisplaySelectorColumn(question.label))}</strong>
+        <div class="choice-grid">
+          ${question.choices.map((choice) => `
+            <button class="choice-button" type="button" data-selector-column="${escapeHtml(question.column)}" data-selector-value="${escapeHtml(choice)}">${escapeHtml(getDisplaySelectorValue(question.column, choice))}</button>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function getNestedProductQuestion(selectorState) {
+    const question = selectorState.question;
+    const selections = selectorState.selections || {};
+    if (!question || !selections.Product || question.column === "Product") return null;
+
+    const order = getSelectorSelectionOrder();
+    const productIndex = order.indexOf("Product");
+    const questionIndex = order.indexOf(question.column);
+    if (productIndex < 0 || questionIndex <= productIndex) return null;
+
+    return getBrowseProductChoices(selections).length > 1 ? question : null;
+  }
+
+  function renderProductBrowseChoices(selectorState, nestedQuestion = null) {
+    if (state.productSearchSelection) return "";
+    const selectedProduct = String(selectorState.selections?.Product || selectorState.product?.name || "").trim();
+    if (!selectedProduct) return "";
+
+    const choices = getBrowseProductChoices(selectorState.selections || {});
+    if (choices.length <= 1) return "";
+
+    const selectedKey = normalizeKey(selectedProduct);
+    return `
+      <div class="survey-question product-browse">
+        <strong>Product options</strong>
+        <div class="choice-grid">
+          ${choices.map((choice) => {
+            const selected = normalizeKey(choice) === selectedKey;
+            return `
+              <div class="product-browse-item${selected ? " selected" : ""}">
+                <button class="choice-button${selected ? " selected" : ""}" type="button" data-selector-column="Product" data-selector-value="${escapeHtml(choice)}" data-selector-preserve-after="true" aria-pressed="${selected ? "true" : "false"}">${escapeHtml(getDisplaySelectorValue("Product", choice))}</button>
+                ${selected && nestedQuestion ? renderNestedProductQuestion(nestedQuestion) : ""}
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderNestedProductQuestion(question) {
+    return `
+      <div class="product-browse-nested">
+        <strong>${escapeHtml(getDisplaySelectorColumn(question.label))}</strong>
+        <div class="choice-grid nested-choice-grid">
+          ${question.choices.map((choice) => `
+            <button class="choice-button" type="button" data-selector-column="${escapeHtml(question.column)}" data-selector-value="${escapeHtml(choice)}">${escapeHtml(getDisplaySelectorValue(question.column, choice))}</button>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function getBrowseProductChoices(selections) {
+    const baseSelections = getSelectionsBeforeColumn(selections, "Product");
+    return getSortedSelectorChoices(
+      getCandidateSelectorRows(baseSelections).filter((row) => row.isCompleteProduct),
+      "Product"
+    );
+  }
+
+  function getSelectionsBeforeColumn(selections, column) {
+    const order = getSelectorSelectionOrder();
+    const index = order.indexOf(column);
+    if (index < 0) return { ...selections };
+    return order.slice(0, index).reduce((result, earlierColumn) => {
+      if (selections[earlierColumn]) result[earlierColumn] = selections[earlierColumn];
+      return result;
+    }, {});
   }
 
   function renderProductMountingSurfaces(product) {
@@ -2997,6 +3289,20 @@
     const label = surfaces.length === 1 ? "Mounting surface" : "Mounting surfaces";
     const surfaceLabels = surfaces.map((surface) => getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, surface));
     return `<div class="muted">${escapeHtml(`${label}: ${surfaceLabels.join(", ")}`)}</div>`;
+  }
+
+  function renderProductPrintMode(product) {
+    const printMode = String(product.printMode || "").trim();
+    return printMode ? `<div class="muted">${escapeHtml(`Print mode: ${printMode}`)}</div>` : "";
+  }
+
+  function renderProductLaminate(product) {
+    const laminates = Array.isArray(product.laminates)
+      ? product.laminates.filter(Boolean)
+      : [];
+    if (!laminates.length) return "";
+    const label = laminates.length === 1 ? "Laminate" : "Laminates";
+    return `<div class="muted">${escapeHtml(`${label}: ${laminates.join(", ")}`)}</div>`;
   }
 
   function renderProductLongevity(product) {
@@ -3431,7 +3737,7 @@
       const unit = element.quantity > 0 ? lineTotal / element.quantity : 0;
       const printSize = `${formatNumber(plan.printWidth, 0)} x ${formatNumber(plan.printHeight, 0)} mm${plan.rotated ? " rotated" : ""}`;
       const dropsText = plan.drops > 1 ? `${formatInteger(plan.drops)} vertical` : formatInteger(plan.drops);
-      const cartUrl = buildCartUrl(best.roll, element, unit);
+      const cartUrl = buildCartUrl(best.roll, element, unit, best.printMode);
       if (cartUrl) cartUrls.push(cartUrl);
       return `
         <tr>
@@ -3451,17 +3757,23 @@
     ui.addAllCart.disabled = !cartUrls.length;
   }
 
-  function buildCartUrl(roll, element, unitPrice) {
+  function buildCartUrl(roll, element, unitPrice, printMode = "") {
     if (!roll || !roll.qcode) return "";
     const params = new URLSearchParams({
       qcode: roll.qcode,
       quantity: String(element.quantity),
       width: String(Math.round(element.width)),
       height: String(Math.round(element.height)),
-      shortname: element.shortname,
+      shortname: getCartShortname(element.shortname, printMode),
       price: formatCartPrice(unitPrice)
     });
     return `https://vivad.com.au/shopping-cart?${params.toString()}`;
+  }
+
+  function getCartShortname(shortname, printMode) {
+    const base = String(shortname || "").trim();
+    const mode = String(printMode || "").trim();
+    return mode ? `${base} - ${mode}` : base;
   }
 
   async function addAllToCart() {

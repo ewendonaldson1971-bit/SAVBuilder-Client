@@ -474,6 +474,28 @@ h2 {
   gap: 7px;
 }
 
+.product-browse-item {
+  display: grid;
+  gap: 7px;
+}
+
+.product-browse-nested {
+  display: grid;
+  gap: 7px;
+  margin-left: 14px;
+  padding-left: 12px;
+  border-left: 3px solid #348ede;
+}
+
+.product-browse-nested strong {
+  color: #1d5f9f;
+  font-size: 0.82rem;
+}
+
+.nested-choice-grid {
+  gap: 6px;
+}
+
 .choice-button {
   justify-content: flex-start;
   min-height: 36px;
@@ -487,6 +509,14 @@ h2 {
 .choice-button:hover {
   border-color: var(--green);
   color: var(--green-dark);
+}
+
+.choice-button.selected,
+.choice-button[aria-pressed="true"] {
+  border-color: #348ede;
+  background: #eaf4ff;
+  color: #1d5f9f;
+  box-shadow: 0 0 0 3px rgba(52, 142, 222, 0.12);
 }
 
 .selected-product {
