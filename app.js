@@ -359,9 +359,15 @@
       const choice = event.target.closest("[data-selector-column]");
       const reset = event.target.closest("[data-selector-reset]");
       const back = event.target.closest("[data-selector-back]");
+      const clearFilters = event.target.closest("[data-selector-clear-filters]");
 
       if (reset) {
         resetSurveyAndFilters();
+        return;
+      }
+
+      if (clearFilters) {
+        clearSelectorFilters();
         return;
       }
 
@@ -502,6 +508,22 @@
     state.productSearchSelection = null;
     state.productSearchQuery = "";
     ui.productSearch.value = "";
+    renderBrandSelector();
+    renderClassSelector();
+    renderLimitFilters();
+    renderMountingSurfaceSelector();
+    recalculate();
+  }
+
+  function clearSelectorFilters() {
+    state.brandFilter = "all";
+    state.classFilter = "all";
+    state.limitFilters.clear();
+    state.mountingSurfaceFilter = MOUNTING_SURFACE_ALL;
+    state.productSearchSelection = null;
+    state.productSearchQuery = "";
+    ui.productSearch.value = "";
+    validateSelectorSelections();
     renderBrandSelector();
     renderClassSelector();
     renderLimitFilters();
@@ -1573,6 +1595,9 @@
       title = "Loading product data";
       body = "The selector is waiting for the Apps Script product feed.";
       status = "pending";
+    } else if (!selectorState.candidates.length) {
+      title = "No results found";
+      body = "Clear filters or broaden the selection to see matching SAV products.";
     } else if (!hasProduct && selectorState.question) {
       const question = getDisplaySelectorColumn(selectorState.question.label);
       const count = selectorState.completeProductCount || selectorState.candidates.length;
@@ -3527,7 +3552,7 @@
         ${renderProductSpecSheetLinks(product)}
         ${renderProductSurfaceInfo(product)}
       </div>
-    ` : (!selectorState.question ? `<div class="survey-empty">${escapeHtml(getSelectorEmptyMessage(selectorState))}</div>` : "");
+    ` : (!selectorState.question ? renderSelectorEmptyState(selectorState) : "");
 
     const resetMarkup = Object.keys(selectorState.selections).length ? `
       <div class="survey-actions">
@@ -3543,6 +3568,18 @@
       ${resetMarkup}
     `;
     hydrateOpenGraphPreviews();
+  }
+
+  function renderSelectorEmptyState(selectorState) {
+    const showClearFilters = selectorState.hasRows &&
+      !selectorState.candidates.length &&
+      hasActiveSelectorFilters();
+    return `
+      <div class="survey-empty">
+        <span>${escapeHtml(getSelectorEmptyMessage(selectorState))}</span>
+        ${showClearFilters ? `<button class="ghost-button compact" type="button" data-selector-clear-filters="true">Clear filters</button>` : ""}
+      </div>
+    `;
   }
 
   function renderSelectorQuestion(question) {
@@ -3916,6 +3953,14 @@
     if (!selectorState.candidates.length) return "No results found for this selection";
     if (selectorState.question) return "Answer the product survey to select stock.";
     return "No complete product data is available for this selection yet.";
+  }
+
+  function hasActiveSelectorFilters() {
+    return state.mountingSurfaceFilter !== MOUNTING_SURFACE_ALL ||
+      state.brandFilter !== "all" ||
+      state.classFilter !== "all" ||
+      state.limitFilters.size > 0 ||
+      Boolean(state.productSearchQuery.trim());
   }
 
   function reconcileArtworkMappings(elements) {
