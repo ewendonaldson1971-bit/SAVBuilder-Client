@@ -3616,7 +3616,7 @@
 
   function renderResults(best, options, elements) {
     const roll = best.roll;
-    ui.rollChoice.textContent = getRollChoiceLabel(roll);
+    if (ui.rollChoice) ui.rollChoice.textContent = getRollChoiceLabel(roll);
     ui.metricLinear.textContent = `${formatNumber(best.costs.linearM, 2)} m`;
     ui.metricJoins.textContent = formatInteger(best.joins);
     ui.metricPrice.textContent = formatMoney(best.costs.total);
@@ -3661,7 +3661,7 @@
   }
 
   function renderEmptyResults() {
-    ui.rollChoice.textContent = "No job";
+    if (ui.rollChoice) ui.rollChoice.textContent = "No job";
     ui.metricLinear.textContent = "0.00 m";
     ui.metricJoins.textContent = "0";
     ui.metricPrice.textContent = "$0.00";
@@ -3686,7 +3686,7 @@
   }
 
   function renderProductRequired(selectorState) {
-    ui.rollChoice.textContent = "Select product";
+    if (ui.rollChoice) ui.rollChoice.textContent = "Select product";
     ui.metricLinear.textContent = "0.00 m";
     ui.metricJoins.textContent = "0";
     ui.metricPrice.textContent = "$0.00";
@@ -3881,8 +3881,8 @@
 
   function renderProductSpecSheetLinks(product) {
     const links = [
-      { label: "Product spec sheet", url: normalizePreviewUrl(product.productSpecSheet) },
-      { label: "Laminate spec sheet", url: normalizePreviewUrl(product.laminateSpecSheet) }
+      { label: "Product Data", url: normalizePreviewUrl(product.productSpecSheet) },
+      { label: "Laminate Data", url: normalizePreviewUrl(product.laminateSpecSheet) }
     ].filter((link) => link.url);
 
     if (!links.length) return "";
@@ -3892,6 +3892,7 @@
         ${links.map((link) => `
           <a class="product-spec-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener" aria-label="${escapeHtml(link.label)}" title="${escapeHtml(link.label)}">
             ${renderPdfIcon()}
+            <span class="product-spec-label">${escapeHtml(link.label)}</span>
           </a>
         `).join("")}
       </div>

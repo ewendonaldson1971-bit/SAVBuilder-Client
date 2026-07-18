@@ -894,9 +894,11 @@ h2 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
+  gap: 6px;
+  min-width: 0;
+  width: auto;
   min-height: 42px;
-  padding: 3px;
+  padding: 3px 9px 3px 5px;
   border: 1px solid var(--brand-blue-soft);
   border-radius: 7px;
   background: #fff;
@@ -904,6 +906,10 @@ h2 {
   font-size: 0.82rem;
   font-weight: 800;
   text-decoration: none;
+}
+
+.product-spec-label {
+  white-space: nowrap;
 }
 
 .product-spec-link:hover {
@@ -1259,13 +1265,12 @@ textarea:focus {
   min-width: 0;
 }
 
-.recommendation-actions .status-pill,
 .recommendation-actions .recommendation-cart-button {
   white-space: nowrap;
 }
 
 .results-panel .metric-grid {
-  grid-template-columns: repeat(4, minmax(105px, 1fr)) minmax(220px, auto);
+  grid-template-columns: repeat(4, minmax(105px, 1fr)) minmax(150px, auto);
   gap: 6px;
   align-items: stretch;
 }
