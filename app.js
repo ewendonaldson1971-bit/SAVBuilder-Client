@@ -20,6 +20,7 @@
     document.querySelector("meta[name='sav-builder-apps-script-url']")?.content ||
     ""
   ).trim();
+  const PDF_ICON_SRC = "assets/icons/pdf-file-icon.webp?v=1";
 
   const TILE_OFFSET_MM = 5;
   const MATERIAL_LOADING_MM = 500;
@@ -181,6 +182,7 @@
     elementInputMode: "table",
     productSource: "fallback",
     useOffsetJoins: null,
+    offsetPromptDismissed: false,
     artworks: [],
     artworkErrors: [],
     currentBest: null,
@@ -191,6 +193,8 @@
 
   const ui = {};
   let recalcTimer = 0;
+  let recommendationPanelFrame = 0;
+  let recommendationPanelResizeObserver = null;
   let pdfjsPromise = null;
   let artworkCropInteraction = null;
 
@@ -214,6 +218,7 @@
     renderLimitFilters();
     renderMountingSurfaceSelector();
     attachEvents();
+    initRecommendationPanelSizing();
     recalculate();
     refreshProducts();
   }
@@ -241,6 +246,7 @@
     ui.emailImposition = document.getElementById("email-imposition");
     ui.bleedMm = document.getElementById("bleed-mm");
     ui.overlapMm = document.getElementById("overlap-mm");
+    ui.advancedOffsetChoices = document.getElementById("advanced-offset-choices");
     ui.elementModeInputs = Array.from(document.querySelectorAll("input[name='element-entry-mode']"));
     ui.elementCsvPanel = document.getElementById("element-csv-panel");
     ui.elementTablePanel = document.getElementById("element-table-panel");
@@ -433,6 +439,7 @@
       ui.jobInput.value = SAMPLE_JOB;
       renderElementTableFromText();
       state.useOffsetJoins = null;
+      state.offsetPromptDismissed = false;
       recalculate();
     });
 
@@ -493,17 +500,72 @@
 
     ui.refreshProducts.addEventListener("click", refreshProducts);
 
-    ui.offsetPrompt.addEventListener("click", (event) => {
-      const choice = event.target.closest("[data-offset-choice]");
-      if (!choice) return;
-      state.useOffsetJoins = choice.dataset.offsetChoice === "yes";
-      recalculate();
-    });
+    ui.advancedOffsetChoices?.addEventListener("click", handleOffsetChoiceClick);
+    ui.offsetPrompt.addEventListener("click", handleOffsetPromptClick);
 
     ui.downloadImposition.addEventListener("click", downloadImposition);
     ui.emailImposition.addEventListener("click", emailImposition);
     ui.addAllCartButtons.forEach((button) => {
       button.addEventListener("click", addAllToCart);
+    });
+  }
+
+  function initRecommendationPanelSizing() {
+    if (!ui.resultsPanel) return;
+    scheduleRecommendationPanelSpaceUpdate();
+    window.addEventListener("resize", scheduleRecommendationPanelSpaceUpdate);
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(scheduleRecommendationPanelSpaceUpdate).catch(() => {});
+    }
+    if ("ResizeObserver" in window) {
+      recommendationPanelResizeObserver = new ResizeObserver(scheduleRecommendationPanelSpaceUpdate);
+      recommendationPanelResizeObserver.observe(ui.resultsPanel);
+    }
+  }
+
+  function scheduleRecommendationPanelSpaceUpdate() {
+    window.cancelAnimationFrame(recommendationPanelFrame);
+    recommendationPanelFrame = window.requestAnimationFrame(updateRecommendationPanelSpace);
+  }
+
+  function updateRecommendationPanelSpace() {
+    if (!ui.resultsPanel) return;
+    const rect = ui.resultsPanel.getBoundingClientRect();
+    const bottomOffset = Math.max(0, window.innerHeight - rect.bottom);
+    const reservedSpace = Math.ceil(rect.height + bottomOffset + 28);
+    document.documentElement.style.setProperty("--recommendation-panel-space", `${reservedSpace}px`);
+  }
+
+  function handleOffsetPromptClick(event) {
+    const close = event.target.closest("[data-offset-prompt-close]");
+    if (close) {
+      state.offsetPromptDismissed = true;
+      hideOffsetPrompt();
+      return;
+    }
+    handleOffsetChoiceClick(event);
+  }
+
+  function handleOffsetChoiceClick(event) {
+    const choice = event.target.closest("[data-offset-choice]");
+    if (!choice) return;
+    state.useOffsetJoins = choice.dataset.offsetChoice === "yes";
+    recalculate();
+  }
+
+  function hideOffsetPrompt() {
+    if (!ui.offsetPrompt) return;
+    ui.offsetPrompt.classList.add("hidden");
+    ui.offsetPrompt.innerHTML = "";
+    scheduleRecommendationPanelSpaceUpdate();
+  }
+
+  function syncOffsetChoiceButtons() {
+    const useOffset = state.useOffsetJoins === true;
+    document.querySelectorAll("[data-offset-choice]").forEach((button) => {
+      const selected = button.dataset.offsetChoice === (useOffset ? "yes" : "no");
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
     });
   }
 
@@ -1778,9 +1840,13 @@
     const bleedType = document.querySelector("input[name='bleed-type']:checked")?.value || "none";
     const bleedMm = cleanNumber(ui.bleedMm?.value, 0);
     const overlapMm = cleanNumber(ui.overlapMm?.value, 20);
-    const custom = bleedType !== "none" || bleedMm > 0 || Math.abs(overlapMm - 20) > 0.001;
+    const custom = bleedType !== "none" ||
+      bleedMm > 0 ||
+      Math.abs(overlapMm - 20) > 0.001 ||
+      state.useOffsetJoins === true;
     ui.advancedConfigStatus.textContent = custom ? "Custom" : "Defaults";
     ui.advancedConfigStatus.classList.toggle("custom", custom);
+    syncOffsetChoiceButtons();
   }
 
   function isSyntheticSelectorColumn(column) {
@@ -3560,11 +3626,7 @@
     }
     const widestRoll = options.reduce((max, option) => Math.max(max, option.roll.printableWidth || option.roll.width), 0);
     const fitWarning = getStockFitWarning(best.maxUnrotatedPrintWidth, widestRoll);
-    const recommendationReason = getRecommendationReason(best, options);
-    ui.costBreakdown.innerHTML = `
-      <div class="recommendation-line"><span>Recommendation</span><strong class="recommendation-copy">${escapeHtml(recommendationReason)}</strong></div>
-      <div><span>Imposed length</span><strong>${formatNumber(best.costs.printLinearM, 2)} m</strong></div>
-    `;
+    ui.costBreakdown.innerHTML = "";
     renderArtworkFitWarning(fitWarning);
     setImpositionActionButtonsDisabled(false);
 
@@ -3572,22 +3634,7 @@
     renderOptions(options, best);
     renderPricing(best, elements);
     renderImposition(best);
-  }
-
-  function getRecommendationReason(best, options) {
-    if (!best) return "Select product and data.";
-    if (best.offsetJoinsUsed) return "Offset joins reduce the imposed length.";
-    if (best.joins > 0) return "Best compatible stock; the job will be panelled.";
-
-    const cheapest = options.slice().sort((a, b) =>
-      a.costs.total - b.costs.total ||
-      a.roll.width - b.roll.width
-    )[0];
-
-    if (cheapest === best) return "Lowest-cost compatible roll.";
-    if (cheapest && best.joins < cheapest.joins) return "Fewer joins than the cheapest roll.";
-    if (best.unrotatedFitsAll && cheapest && !cheapest.unrotatedFitsAll) return "Fits the widest entered print size.";
-    return "Best ranked compatible roll.";
+    scheduleRecommendationPanelSpaceUpdate();
   }
 
   function getStockFitWarning(requiredWidth, widestRoll) {
@@ -3635,6 +3682,7 @@
     ui.impositionSummary.textContent = "";
     ui.impositionPreview.innerHTML = `<div class="empty-state">Enter job elements to calculate the roll.</div>`;
     setImpositionActionButtonsDisabled(true);
+    scheduleRecommendationPanelSpaceUpdate();
   }
 
   function renderProductRequired(selectorState) {
@@ -3659,6 +3707,7 @@
     ui.impositionSummary.textContent = "";
     ui.impositionPreview.innerHTML = `<div class="empty-state">${escapeHtml(getSelectorEmptyMessage(selectorState))}</div>`;
     setImpositionActionButtonsDisabled(true);
+    scheduleRecommendationPanelSpaceUpdate();
   }
 
   function renderInputErrors(errors) {
@@ -3850,13 +3899,7 @@
   }
 
   function renderPdfIcon() {
-    return `
-      <svg class="pdf-icon" aria-hidden="true" viewBox="0 0 24 24">
-        <path d="M6 2h8l4 4v16H6z"></path>
-        <path d="M14 2v5h5"></path>
-        <text x="12" y="17" text-anchor="middle">PDF</text>
-      </svg>
-    `;
+    return `<img class="pdf-icon" src="${escapeHtml(PDF_ICON_SRC)}" alt="" aria-hidden="true" loading="lazy">`;
   }
 
   function renderProductLongevity(product) {
@@ -4241,9 +4284,8 @@
   function renderOffsetPrompt(best) {
     const savingMm = best.evenPack.lengthMm - best.offsetPack.lengthMm;
     const meaningful = best.offsetSaves && savingMm > Math.max(50, best.evenPack.lengthMm * 0.005);
-    if (!meaningful) {
-      ui.offsetPrompt.classList.add("hidden");
-      ui.offsetPrompt.innerHTML = "";
+    if (!meaningful || state.offsetPromptDismissed) {
+      hideOffsetPrompt();
       return;
     }
 
@@ -4254,13 +4296,17 @@
 
     ui.offsetPrompt.classList.remove("hidden");
     ui.offsetPrompt.innerHTML = `
-      <p>Do you want to save stock by offsetting the panel joins?</p>
+      <div class="offset-prompt-header">
+        <p>Do you want to save stock by offsetting the panel joins?</p>
+        <button class="icon-button offset-prompt-close" type="button" data-offset-prompt-close aria-label="Hide offset join prompt" title="Hide offset join prompt">X</button>
+      </div>
       <div class="muted">${escapeHtml(active)} Potential saving: ${formatNumber(savingM, 2)} linear metres.</div>
       <div class="prompt-actions">
         <button class="offset-choice-button compact${state.useOffsetJoins === true ? " selected" : ""}" type="button" data-offset-choice="yes" aria-pressed="${state.useOffsetJoins === true ? "true" : "false"}">Use offset joins</button>
         <button class="offset-choice-button compact${state.useOffsetJoins === true ? "" : " selected"}" type="button" data-offset-choice="no" aria-pressed="${state.useOffsetJoins === true ? "false" : "true"}">Keep even joins</button>
       </div>
     `;
+    syncOffsetChoiceButtons();
   }
 
   function renderOptions(options, best) {
