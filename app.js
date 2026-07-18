@@ -109,6 +109,9 @@
   const IMPOSITION_EMAIL_TO = "sales@vivad.com.au";
   const IMPOSITION_EMAIL_SUBJECT = "SavBuilder imposition submitted";
   const IMPOSITION_EMAIL_ACTION = "email-imposition";
+  const ADD_TO_CART_EMAIL_TO = "jtlog@vivad.com.au";
+  const ADD_TO_CART_EMAIL_SUBJECT = "SAVBuilder Add to cart";
+  const ADD_TO_CART_EMAIL_ACTION = "add-to-cart";
 
   const FALLBACK_SELECTOR_CSV = [
     '"Surface","Mounting Surface","Type","Laminate","Longevity","Product","Width1","Cost1","Width2","Cost2","Print SQM Rate"',
@@ -182,7 +185,8 @@
     artworkErrors: [],
     currentBest: null,
     currentOptions: [],
-    currentCartUrls: []
+    currentCartUrls: [],
+    currentCartLines: []
   };
 
   const ui = {};
@@ -3327,6 +3331,7 @@
     ui.optionsBody.innerHTML = "";
     ui.pricingBody.innerHTML = "";
     state.currentCartUrls = [];
+    state.currentCartLines = [];
     setAddAllCartButtonsDisabled(true);
     ui.optionCount.textContent = "";
     ui.priceSummary.textContent = "";
@@ -3350,6 +3355,7 @@
     ui.optionsBody.innerHTML = "";
     ui.pricingBody.innerHTML = "";
     state.currentCartUrls = [];
+    state.currentCartLines = [];
     setAddAllCartButtonsDisabled(true);
     ui.optionCount.textContent = "";
     ui.priceSummary.textContent = "";
@@ -3961,6 +3967,7 @@
   function renderPricing(best, elements) {
     ui.priceSummary.textContent = `${formatMoney(best.costs.total)} over ${formatNumber(best.costs.finishedAreaSqm, 2)} sqm finished area`;
     const cartUrls = [];
+    const cartLines = [];
     ui.pricingBody.innerHTML = elements.map((element, index) => {
       const plan = best.elementPlans.find((item) => item.elementIndex === index);
       const areaSqm = (element.width * element.height) / 1000000;
@@ -3970,7 +3977,23 @@
       const printSize = `${formatNumber(plan.printWidth, 0)} x ${formatNumber(plan.printHeight, 0)} mm${plan.rotated ? " rotated" : ""}`;
       const dropsText = plan.drops > 1 ? `${formatInteger(plan.drops)} vertical` : formatInteger(plan.drops);
       const cartUrl = buildCartUrl(best.roll, element, unit, best.printMode, best.offsetJoinsUsed);
-      if (cartUrl) cartUrls.push(cartUrl);
+      if (cartUrl) {
+        cartUrls.push(cartUrl);
+        cartLines.push({
+          shortname: getCartShortname(element.shortname, best.printMode, best.offsetJoinsUsed),
+          enteredShortname: element.shortname,
+          quantity: element.quantity,
+          width: element.width,
+          height: element.height,
+          printSize,
+          drops: dropsText,
+          areaSqm: lineArea,
+          unit,
+          lineTotal,
+          qcode: best.roll.qcode,
+          cartUrl
+        });
+      }
       return `
         <tr>
           <td>${escapeHtml(element.shortname)}</td>
@@ -3986,6 +4009,7 @@
       `;
     }).join("");
     state.currentCartUrls = cartUrls;
+    state.currentCartLines = cartLines;
     setAddAllCartButtonsDisabled(!cartUrls.length);
   }
 
@@ -4016,6 +4040,14 @@
     const originalLabels = new Map(ui.addAllCartButtons.map((button) => [button, button.textContent]));
     setAddAllCartButtonsDisabled(true);
     let cartWindow = window.open(urls[0], CART_WINDOW_NAME);
+    let addToCartEmailError = null;
+    const addToCartEmailPromise = submitAddToCartEmail({
+      bodyText: buildAddToCartEmailBody(),
+      lineCount: state.currentCartLines.length,
+      total: state.currentBest ? formatMoney(state.currentBest.costs.total) : ""
+    }).catch((error) => {
+      addToCartEmailError = error;
+    });
 
     try {
       for (let index = 0; index < urls.length; index += 1) {
@@ -4027,10 +4059,14 @@
       }
     } finally {
       await wait(250);
+      await addToCartEmailPromise;
       ui.addAllCartButtons.forEach((button) => {
         button.textContent = originalLabels.get(button) || "Add all to cart";
       });
       setAddAllCartButtonsDisabled(!state.currentCartUrls.length);
+      if (addToCartEmailError) {
+        window.alert(addToCartEmailError?.message || "Could not email the add-to-cart details.");
+      }
     }
   }
 
@@ -4294,6 +4330,7 @@
       await submitImpositionEmail({
         svg: getCurrentImpositionSvg(),
         filename: getImpositionFilename(),
+        bodyText: buildImpositionEmailBody(),
         productName: state.currentBest.productName,
         rollWidth: Math.round(state.currentBest.roll.width),
         total: formatMoney(state.currentBest.costs.total)
@@ -4313,21 +4350,221 @@
   }
 
   async function submitImpositionEmail(payload) {
-    const formData = new FormData();
-    formData.set("action", IMPOSITION_EMAIL_ACTION);
-    formData.set("mode", APP_MODE);
-    formData.set("subject", IMPOSITION_EMAIL_SUBJECT);
-    formData.set("filename", payload.filename);
-    formData.set("svg", payload.svg);
-    formData.set("productName", payload.productName || "");
-    formData.set("rollWidth", String(payload.rollWidth || ""));
-    formData.set("total", payload.total || "");
-
-    await fetch(APPS_SCRIPT_WEB_APP_URL, {
-      method: "POST",
-      mode: "no-cors",
-      body: formData
+    await postAppsScriptPayload({
+      action: IMPOSITION_EMAIL_ACTION,
+      mode: APP_MODE,
+      subject: IMPOSITION_EMAIL_SUBJECT,
+      filename: payload.filename,
+      bodyText: payload.bodyText || "",
+      svg: payload.svg,
+      productName: payload.productName || "",
+      rollWidth: String(payload.rollWidth || ""),
+      total: payload.total || ""
     });
+  }
+
+  async function submitAddToCartEmail(payload) {
+    await postAppsScriptPayload({
+      action: ADD_TO_CART_EMAIL_ACTION,
+      mode: APP_MODE,
+      subject: ADD_TO_CART_EMAIL_SUBJECT,
+      bodyText: payload.bodyText || "",
+      lineCount: String(payload.lineCount || ""),
+      total: payload.total || ""
+    });
+  }
+
+  async function postAppsScriptPayload(params) {
+    if (!isAppsScriptConfigured()) {
+      throw new Error("Apps Script is not configured yet.");
+    }
+
+    const body = new URLSearchParams();
+    Object.entries(params).forEach(([name, value]) => {
+      body.set(name, String(value ?? ""));
+    });
+
+    const response = await fetch(APPS_SCRIPT_WEB_APP_URL, {
+      method: "POST",
+      mode: "cors",
+      body
+    });
+    const text = await response.text();
+    const payloadResponse = parseAppsScriptJsonResponse(text);
+
+    if (!response.ok || !payloadResponse?.ok) {
+      throw new Error(payloadResponse?.error || `Apps Script email failed with HTTP ${response.status}.`);
+    }
+  }
+
+  function parseAppsScriptJsonResponse(text) {
+    const cleanText = String(text || "").trim();
+    if (!cleanText) return null;
+    try {
+      return JSON.parse(cleanText);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function buildAddToCartEmailBody() {
+    const best = state.currentBest;
+    const product = state.selectedProduct;
+    if (!best) return "SAVBuilder Add to cart";
+
+    const lines = [
+      "SAVBuilder Add to cart",
+      "",
+      "Selected product",
+      `Product: ${best.productName}`,
+      ...getProductEmailLines(product),
+      "",
+      "Selected roll",
+      ...getSelectedRollEmailLines(best),
+      "",
+      "Cart lines",
+      ...getAddToCartLineEmailLines()
+    ];
+
+    return normalizeEmailBodyLines(lines);
+  }
+
+  function getAddToCartLineEmailLines() {
+    const lines = Array.isArray(state.currentCartLines) ? state.currentCartLines : [];
+    if (!lines.length) return ["No cart lines were available."];
+
+    return lines.flatMap((line, index) => [
+      `${index + 1}. ${line.shortname}`,
+      `Qty: ${formatInteger(line.quantity)}`,
+      `Size: ${formatNumber(line.width, 0)} x ${formatNumber(line.height, 0)} mm`,
+      `Entered shortname: ${line.enteredShortname}`,
+      `Print size: ${line.printSize}`,
+      `Drops: ${line.drops}`,
+      `Area: ${formatNumber(line.areaSqm, 2)} sqm`,
+      `Unit price: ${formatMoney(line.unit)}`,
+      `Line total: ${formatMoney(line.lineTotal)}`,
+      line.qcode ? `QCode: ${line.qcode}` : "",
+      `Product cart: ${line.cartUrl}`,
+      ""
+    ]);
+  }
+
+  function buildImpositionEmailBody() {
+    const best = state.currentBest;
+    const product = state.selectedProduct;
+    if (!best) return "SAV Builder imposition submitted.";
+
+    const parsed = parseElements(ui.jobInput.value);
+    const lines = [
+      "SAV Builder imposition submitted.",
+      "",
+      "Selected product",
+      `Product: ${best.productName}`,
+      ...getProductEmailLines(product),
+      "",
+      "Selected roll",
+      ...getSelectedRollEmailLines(best),
+      "",
+      "Entered data",
+      ...getEnteredDataEmailLines(parsed.elements, best),
+      "",
+      "Surface descriptions and links",
+      ...getSurfaceInfoEmailLines(product)
+    ];
+
+    return normalizeEmailBodyLines(lines);
+  }
+
+  function getProductEmailLines(product) {
+    if (!product) return [];
+
+    return [
+      ...getSelectorSelectionEmailLines(product),
+      getArraySummaryLine("Laminate", "Laminates", product.laminates),
+      product.printMode ? `Print mode: ${product.printMode}` : "",
+      getArraySummaryLine("Mounting surface", "Mounting surfaces", getDisplayMountingSurfaceValues(product.mountingSurfaces)),
+      getArraySummaryLine("Longevity", "Longevities", product.longevities),
+      product.productSpecSheet ? `Product spec sheet: ${normalizePreviewUrl(product.productSpecSheet)}` : "",
+      product.laminateSpecSheet ? `Laminate spec sheet: ${normalizePreviewUrl(product.laminateSpecSheet)}` : ""
+    ];
+  }
+
+  function getSelectorSelectionEmailLines(product) {
+    const selections = product?.selectorSelections || {};
+    const order = getSelectorSelectionOrder();
+    return order
+      .filter((column) => selections[column] && column !== "Product")
+      .map((column) => `${getDisplaySelectorColumn(column)}: ${getDisplaySelectorValue(column, selections[column])}`);
+  }
+
+  function getSelectedRollEmailLines(best) {
+    const roll = best.roll || {};
+    const printableWidth = cleanNumber(roll.printableWidth, getPrintableRollWidth(roll));
+    return [
+      `Roll width: ${formatInteger(roll.width)} mm`,
+      `Printable width: ${formatInteger(printableWidth)} mm`,
+      roll.qcode ? `QCode: ${roll.qcode}` : "",
+      Number.isFinite(roll.productCost) ? `Product cost: ${formatMoney(roll.productCost)} / lm` : "",
+      Number.isFinite(roll.laminateCost) && roll.laminateCost > 0 ? `Laminate cost: ${formatMoney(roll.laminateCost)} / lm` : "",
+      `Print mode: ${best.printMode || "Standard"}`,
+      `Print SQM rate: ${formatMoney(best.costs.printRate)} / sqm`,
+      `Imposed length: ${formatNumber(best.costs.printLinearM, 2)} m`,
+      `Stock length charged: ${formatNumber(best.costs.linearM, 2)} m`,
+      `Joins: ${formatInteger(best.joins)}`,
+      `SQM rate: ${formatMoney(best.costs.rate)} / sqm`,
+      `Total: ${formatMoney(best.costs.total)}`
+    ];
+  }
+
+  function getEnteredDataEmailLines(elements, best) {
+    if (!elements.length) return ["No entered data."];
+
+    return elements.map((element, index) => {
+      const plan = best.elementPlans.find((item) => item.elementIndex === index);
+      const printSize = plan
+        ? `${formatNumber(plan.printWidth, 0)} x ${formatNumber(plan.printHeight, 0)} mm${plan.rotated ? " rotated" : ""}`
+        : "not calculated";
+      const drops = plan ? formatInteger(plan.drops) : "0";
+      const joins = plan ? formatInteger(plan.joins) : "0";
+      return `${index + 1}. ${element.shortname} - Qty ${formatInteger(element.quantity)}, finished ${formatNumber(element.width, 0)} x ${formatNumber(element.height, 0)} mm, print ${printSize}, drops ${drops}, joins ${joins}`;
+    });
+  }
+
+  function getSurfaceInfoEmailLines(product) {
+    const infos = Array.isArray(product?.surfaceInfos)
+      ? product.surfaceInfos.filter((info) => info.description || normalizePreviewUrl(info.link))
+      : [];
+    if (!infos.length) return ["No surface description or link selected."];
+
+    return infos.flatMap((info) => {
+      const surface = getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, info.surface);
+      return [
+        surface ? `${surface}:` : "",
+        info.description ? `Description: ${info.description}` : "",
+        normalizePreviewUrl(info.link) ? `Link: ${normalizePreviewUrl(info.link)}` : ""
+      ];
+    });
+  }
+
+  function getDisplayMountingSurfaceValues(values) {
+    return Array.isArray(values)
+      ? values.map((value) => getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, value))
+      : [];
+  }
+
+  function getArraySummaryLine(singularLabel, pluralLabel, values) {
+    const items = Array.isArray(values) ? values.filter(Boolean) : [];
+    if (!items.length) return "";
+    return `${items.length === 1 ? singularLabel : pluralLabel}: ${items.join(", ")}`;
+  }
+
+  function normalizeEmailBodyLines(lines) {
+    return lines
+      .map((line) => String(line ?? "").trim())
+      .filter((line, index, allLines) => line || allLines[index - 1])
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
   }
 
   function getCurrentImpositionSvg() {

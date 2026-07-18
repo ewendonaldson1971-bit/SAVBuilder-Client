@@ -8,6 +8,9 @@ const DEFAULT_DEV_SELECTOR_SHEET_NAME = "DEV";
 const IMPOSITION_EMAIL_TO = "sales@vivad.com.au";
 const IMPOSITION_EMAIL_SUBJECT = "SavBuilder imposition submitted";
 const IMPOSITION_EMAIL_ACTION = "email-imposition";
+const ADD_TO_CART_EMAIL_TO = "jtlog@vivad.com.au";
+const ADD_TO_CART_EMAIL_SUBJECT = "SAVBuilder Add to cart";
+const ADD_TO_CART_EMAIL_ACTION = "add-to-cart";
 const MAX_IMPOSITION_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
 function doGet(event) {
@@ -35,6 +38,8 @@ function doPost(event) {
     const action = String(params.action || "").trim().toLowerCase();
     if (action === IMPOSITION_EMAIL_ACTION) {
       payload = handleImpositionEmail(params);
+    } else if (action === ADD_TO_CART_EMAIL_ACTION) {
+      payload = handleAddToCartEmail(params);
     } else {
       payload = {
         ok: false,
@@ -49,6 +54,16 @@ function doPost(event) {
   }
 
   return writePayload(payload, "");
+}
+
+function authorizeMailApp() {
+  const recipient = Session.getEffectiveUser().getEmail();
+  MailApp.sendEmail({
+    to: recipient,
+    subject: "SAV Builder MailApp authorization",
+    body: "MailApp authorization for SAV Builder is now active.",
+    name: "SAV Builder"
+  });
 }
 
 function handleRequest(params) {
@@ -84,7 +99,7 @@ function handleImpositionEmail(params) {
   const total = String(params.total || "").trim();
   const mode = getMode(params.mode);
 
-  const body = [
+  const fallbackBody = [
     "SAV Builder imposition submitted.",
     "",
     productName ? `Product: ${productName}` : "",
@@ -92,6 +107,7 @@ function handleImpositionEmail(params) {
     total ? `Total: ${total}` : "",
     `Mode: ${mode}`
   ].filter(Boolean).join("\n");
+  const body = String(params.bodyText || "").trim() || fallbackBody;
 
   MailApp.sendEmail({
     to: IMPOSITION_EMAIL_TO,
@@ -101,6 +117,22 @@ function handleImpositionEmail(params) {
     attachments: [
       Utilities.newBlob(svg, "image/svg+xml", filename)
     ]
+  });
+
+  return {
+    ok: true
+  };
+}
+
+function handleAddToCartEmail(params) {
+  const body = String(params.bodyText || "").trim();
+  if (!body) throw new Error("No add-to-cart details were received.");
+
+  MailApp.sendEmail({
+    to: ADD_TO_CART_EMAIL_TO,
+    subject: ADD_TO_CART_EMAIL_SUBJECT,
+    body,
+    name: "SAV Builder"
   });
 
   return {

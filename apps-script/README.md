@@ -40,6 +40,16 @@ The public app can still see the Apps Script Web App URL, but it cannot see the 
 
 The app can submit the generated imposition SVG to Apps Script. `Code.gs` sends it to `sales@vivad.com.au` with the subject `SavBuilder imposition submitted` using `MailApp.sendEmail`. The first deployment or update may ask the Vivad1958 Google account to authorize email sending.
 
+The app also sends an add-to-cart summary to `jtlog@vivad.com.au` with the subject `SAVBuilder Add to cart` when a user clicks either **Add all to cart** button. The email body includes the selected product/laminate details and each cart line's shortname, quantity, size, QCode, pricing, and cart URL.
+
+If the app reports `You do not have permission to call MailApp.sendEmail`, authorize email sending in Apps Script:
+
+1. Open the Apps Script project while signed in as **Vivad1958@gmail.com**.
+2. Paste the latest `Code.gs` into the project and save it.
+3. Select `authorizeMailApp` from the function dropdown.
+4. Click **Run** and approve the requested Google permissions.
+5. Deploy a new Web App version with **Execute as: Me** and **Who has access: Anyone**.
+
 ## Troubleshooting
 
 If the Web App URL returns `Script function not found: doGet`, the deployment is not running the `Code.gs` in this folder. Paste this `Code.gs` into the Apps Script project, save it, then create a new Web App deployment or edit the existing deployment to use a new version.
