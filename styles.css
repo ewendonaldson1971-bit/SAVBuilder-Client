@@ -296,7 +296,7 @@ h2 {
 
 .configurator-progress {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin: 0 0 14px;
 }
@@ -306,10 +306,16 @@ h2 {
   gap: 2px;
   min-width: 0;
   min-height: 45px;
+  width: 100%;
   padding: 6px 7px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: #fff;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 
 .configurator-step span {
@@ -347,8 +353,46 @@ h2 {
   box-shadow: 0 0 0 3px rgba(52, 142, 222, 0.10);
 }
 
+.configurator-step:hover {
+  border-color: #348ede;
+  box-shadow: 0 0 0 3px rgba(52, 142, 222, 0.10);
+  transform: translateY(-1px);
+}
+
+.configurator-step:focus-visible {
+  outline: 3px solid rgba(52, 142, 222, 0.35);
+  outline-offset: 2px;
+}
+
 .configurator-step.pending {
   opacity: 0.68;
+}
+
+.configurator-step.pending:hover {
+  opacity: 1;
+}
+
+.product-search,
+.filters-panel,
+.input-panel,
+.results-panel,
+.wide-panel {
+  scroll-margin-top: 14px;
+  scroll-margin-bottom: calc(var(--recommendation-panel-space) + 18px);
+}
+
+.progress-target-highlight {
+  animation: progress-target-pulse 1.3s ease;
+}
+
+@keyframes progress-target-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 142, 222, 0.35);
+  }
+
+  100% {
+    box-shadow: 0 0 0 8px rgba(52, 142, 222, 0);
+  }
 }
 
 .configurator-guidance {

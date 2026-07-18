@@ -224,6 +224,8 @@
     ui.configuratorProgress = document.getElementById("configurator-progress");
     ui.configuratorGuidance = document.getElementById("configurator-guidance");
     ui.advancedConfigStatus = document.getElementById("advanced-config-status");
+    ui.productSearchPanel = document.querySelector(".product-search");
+    ui.filtersPanel = document.querySelector(".filters-panel");
     ui.brandSelector = document.getElementById("brand-selector");
     ui.classSelector = document.getElementById("class-selector");
     ui.limitSelector = document.getElementById("limit-selector");
@@ -242,6 +244,7 @@
     ui.elementModeInputs = Array.from(document.querySelectorAll("input[name='element-entry-mode']"));
     ui.elementCsvPanel = document.getElementById("element-csv-panel");
     ui.elementTablePanel = document.getElementById("element-table-panel");
+    ui.inputPanel = document.querySelector(".input-panel");
     ui.elementRowsBody = document.getElementById("element-rows-body");
     ui.addElementRow = document.getElementById("add-element-row");
     ui.jobInput = document.getElementById("job-input");
@@ -256,6 +259,7 @@
     ui.metricJoins = document.getElementById("metric-joins");
     ui.metricPrice = document.getElementById("metric-price");
     ui.metricRate = document.getElementById("metric-rate");
+    ui.resultsPanel = document.querySelector(".results-panel");
     ui.costBreakdown = document.getElementById("cost-breakdown");
     ui.offsetPrompt = document.getElementById("offset-prompt");
     ui.optionCount = document.getElementById("option-count");
@@ -267,6 +271,7 @@
     ui.pricingBody = document.getElementById("pricing-body");
     ui.impositionSummary = document.getElementById("imposition-summary");
     ui.impositionPreview = document.getElementById("imposition-preview");
+    ui.stockOptionsPanel = document.getElementById("widths-title")?.closest("section");
   }
 
   function applyAppMode() {
@@ -280,6 +285,8 @@
 
   function attachEvents() {
     ui.productSearch.addEventListener("input", handleProductSearchInput);
+
+    ui.configuratorProgress.addEventListener("click", handleConfiguratorProgressClick);
 
     ui.productSearchResults.addEventListener("click", (event) => {
       const result = event.target.closest("[data-product-search-index]");
@@ -529,6 +536,108 @@
     renderLimitFilters();
     renderMountingSurfaceSelector();
     recalculate();
+  }
+
+  function handleConfiguratorProgressClick(event) {
+    const step = event.target.closest("[data-configurator-target]");
+    if (!step) return;
+    goToConfiguratorTarget(step.dataset.configuratorTarget);
+  }
+
+  function goToConfiguratorTarget(target) {
+    const targetElements = getConfiguratorTargetElements(target);
+    if (!targetElements?.scrollTarget) return;
+
+    const shouldScroll = !isElementVisible(targetElements.scrollTarget);
+    if (shouldScroll) {
+      targetElements.scrollTarget.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest"
+      });
+    }
+    highlightConfiguratorTarget(targetElements.scrollTarget);
+
+    const focusTarget = targetElements.focusTarget ||
+      getFirstFocusableElement(targetElements.scrollTarget) ||
+      targetElements.scrollTarget;
+    window.setTimeout(() => focusElementWithoutJump(focusTarget), shouldScroll ? 140 : 0);
+  }
+
+  function isElementVisible(element) {
+    if (!element) return false;
+    const rect = element.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const margin = 12;
+    return rect.bottom > margin &&
+      rect.top < viewportHeight - margin &&
+      rect.right > margin &&
+      rect.left < viewportWidth - margin;
+  }
+
+  function getConfiguratorTargetElements(target) {
+    if (target === "product") {
+      return {
+        scrollTarget: ui.productSearchPanel || ui.productSearch,
+        focusTarget: ui.productSearch
+      };
+    }
+
+    if (target === "filters") {
+      return {
+        scrollTarget: ui.filtersPanel,
+        focusTarget: getFirstFocusableElement(ui.filtersPanel)
+      };
+    }
+
+    if (target === "data") {
+      return {
+        scrollTarget: ui.inputPanel,
+        focusTarget: getDataEntryFocusTarget()
+      };
+    }
+
+    if (target === "result") {
+      return {
+        scrollTarget: ui.resultsPanel || ui.stockOptionsPanel,
+        focusTarget: ui.fixedAddAllCart && !ui.fixedAddAllCart.disabled ? ui.fixedAddAllCart : ui.resultsPanel
+      };
+    }
+
+    return null;
+  }
+
+  function getDataEntryFocusTarget() {
+    if (state.elementInputMode === "csv") return ui.jobInput;
+    return ui.elementRowsBody?.querySelector("[data-element-field]") || ui.addElementRow || ui.jobInput;
+  }
+
+  function getFirstFocusableElement(container) {
+    return container?.querySelector("button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])") || null;
+  }
+
+  function highlightConfiguratorTarget(element) {
+    element.classList.remove("progress-target-highlight");
+    void element.offsetWidth;
+    element.classList.add("progress-target-highlight");
+    window.setTimeout(() => element.classList.remove("progress-target-highlight"), 1300);
+  }
+
+  function focusElementWithoutJump(element) {
+    if (!element) return;
+    const hadTabIndex = element.hasAttribute("tabindex");
+    if (!isNaturallyFocusable(element) && !hadTabIndex) {
+      element.setAttribute("tabindex", "-1");
+    }
+    element.focus({ preventScroll: true });
+    if (!hadTabIndex && element.getAttribute("tabindex") === "-1") {
+      window.setTimeout(() => element.removeAttribute("tabindex"), 500);
+    }
+  }
+
+  function isNaturallyFocusable(element) {
+    return Boolean(element.matches("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"));
   }
 
   function handleArtworkCropClick(event) {
@@ -1540,6 +1649,7 @@
     const hasProduct = Boolean(selectorState.product);
     const hasElements = elements.length > 0;
     const activeFilterCount = getActiveFilterCount();
+    const filterSummary = getProgressFilterSummary(activeFilterCount);
     const currentQuestion = selectorState.question
       ? getDisplaySelectorColumn(selectorState.question.label)
       : "Select";
@@ -1548,38 +1658,44 @@
       {
         label: "Product",
         value: product?.name || currentQuestion,
-        status: hasProduct ? "complete" : "current"
-      },
-      {
-        label: "Surface",
-        value: state.mountingSurfaceFilter === MOUNTING_SURFACE_ALL
-          ? "All"
-          : getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, state.mountingSurfaceFilter),
-        status: state.mountingSurfaceFilter === MOUNTING_SURFACE_ALL ? "neutral" : "complete"
+        status: hasProduct ? "complete" : "current",
+        target: "product"
       },
       {
         label: "Filters",
-        value: activeFilterCount ? `${activeFilterCount} active` : "Default",
-        status: activeFilterCount ? "complete" : "neutral"
+        value: filterSummary,
+        status: activeFilterCount ? "complete" : "neutral",
+        target: "filters"
       },
       {
         label: "Data",
         value: hasElements ? `${elements.length} ${elements.length === 1 ? "row" : "rows"}` : "No job",
-        status: hasElements ? "complete" : (hasProduct ? "current" : "pending")
+        status: hasElements ? "complete" : (hasProduct ? "current" : "pending"),
+        target: "data"
       },
       {
         label: "Result",
         value: hasProduct && hasElements ? "Ready" : "Pending",
-        status: hasProduct && hasElements ? "complete" : "pending"
+        status: hasProduct && hasElements ? "complete" : "pending",
+        target: "result"
       }
     ];
 
     ui.configuratorProgress.innerHTML = steps.map((step) => `
-      <span class="configurator-step ${escapeHtml(step.status)}">
+      <button class="configurator-step ${escapeHtml(step.status)}" type="button" data-configurator-target="${escapeHtml(step.target)}" aria-label="${escapeHtml(`Go to ${step.label}: ${step.value}`)}">
         <span>${escapeHtml(step.label)}</span>
         <strong>${escapeHtml(step.value)}</strong>
-      </span>
+      </button>
     `).join("");
+  }
+
+  function getProgressFilterSummary(activeFilterCount = getActiveFilterCount()) {
+    if (!activeFilterCount) return "Default";
+    const surface = state.mountingSurfaceFilter === MOUNTING_SURFACE_ALL
+      ? ""
+      : getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, state.mountingSurfaceFilter);
+    if (surface && activeFilterCount === 1) return `Surface: ${surface}`;
+    return `${activeFilterCount} active`;
   }
 
   function renderConfiguratorGuidance(selectorState, elements = [], best = null) {
@@ -1626,6 +1742,7 @@
 
   function getActiveFilterCount() {
     return [
+      state.mountingSurfaceFilter !== MOUNTING_SURFACE_ALL,
       state.brandFilter !== "all",
       state.classFilter !== "all",
       state.limitFilters.size > 0
