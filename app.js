@@ -290,6 +290,15 @@
   }
 
   function attachEvents() {
+    document.querySelectorAll(".help-button").forEach((button) => {
+      button.addEventListener("pointerdown", (event) => event.stopPropagation());
+      button.addEventListener("keydown", (event) => event.stopPropagation());
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+    });
+
     ui.productSearch.addEventListener("input", handleProductSearchInput);
 
     ui.configuratorProgress.addEventListener("click", handleConfiguratorProgressClick);

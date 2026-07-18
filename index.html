@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SAV Builder-Live</title>
-    <link rel="stylesheet" href="styles.css?v=guided-configurator-remove-roll-pill-20260718">
+    <link rel="stylesheet" href="styles.css?v=guided-configurator-help-tooltips-20260718">
   </head>
   <body>
     <header class="app-header">
@@ -43,7 +43,12 @@
     <main class="app-shell">
       <section class="setup-panel surface" aria-labelledby="setup-title">
         <div class="section-heading">
-          <h2 id="setup-title">Product Selector</h2>
+          <div class="heading-title">
+            <h2 id="setup-title">Product Selector</h2>
+            <span class="help-tooltip" data-help="Use the Product Selector to choose the right SAV for your application. You can search by QCode, product name, mounting surface and laminate. Use the Mounting Surface, Brand, Class and Properties filters to assist with your product selection. The app will either tile or panel your job according to the size of the job and the stock width.">
+              <button class="help-button" type="button" aria-label="Product Selector help: Use the Product Selector to choose the right SAV for your application. You can search by QCode, product name, mounting surface and laminate. Use the Mounting Surface, Brand, Class and Properties filters to assist with your product selection. The app will either tile or panel your job according to the size of the job and the stock width.">?</button>
+            </span>
+          </div>
         </div>
 
         <div class="setup-reset-row">
@@ -92,7 +97,10 @@
           <summary>
             <span class="advanced-config-title">
               <span class="advanced-config-icon" aria-hidden="true">+</span>
-              Advanced Options
+              <span>Advanced Options</span>
+              <span class="help-tooltip" data-help="You can select no bleed, bleed all around or bleed bottom and right only, and specify both bleed amount and panel overlap. Stock can be saved by offsetting joins and then imposing the extra panels to save stock.">
+                <button class="help-button" type="button" aria-label="Advanced Options help: You can select no bleed, bleed all around or bleed bottom and right only, and specify both bleed amount and panel overlap. Stock can be saved by offsetting joins and then imposing the extra panels to save stock.">?</button>
+              </span>
             </span>
             <span id="advanced-config-status" class="advanced-config-status">Defaults</span>
           </summary>
@@ -140,7 +148,12 @@
 
       <section class="input-panel surface" aria-labelledby="elements-title">
         <div class="section-heading">
-          <h2 id="elements-title">Data Entry</h2>
+          <div class="heading-title">
+            <h2 id="elements-title">Data Entry</h2>
+            <span class="help-tooltip" data-help="Enter the quantities and sizes and a shortname to identify each print. For multiple line items you can copy the data from a spreadsheet respecting the column headings below or import a comma delimited CSV file. Use the upload artwork feature to see the position of panel joins. You can download the imposition or email it to our customer service team by clicking the email button.">
+              <button class="help-button" type="button" aria-label="Data Entry help: Enter the quantities and sizes and a shortname to identify each print. For multiple line items you can copy the data from a spreadsheet respecting the column headings below or import a comma delimited CSV file. Use the upload artwork feature to see the position of panel joins. You can download the imposition or email it to our customer service team by clicking the email button.">?</button>
+            </span>
+          </div>
           <button class="ghost-button compact" id="load-sample" type="button">Sample</button>
         </div>
         <div class="entry-mode">
@@ -182,7 +195,12 @@
 
       <section class="artwork-panel surface" aria-labelledby="artwork-title">
         <div class="section-heading">
-          <h2 id="artwork-title">Artwork</h2>
+          <div class="heading-title">
+            <h2 id="artwork-title">Artwork</h2>
+            <span class="help-tooltip" data-help="You can upload your artwork to the app to see a low resolution preview of where the panel joins will be placed. You can download an imposition and email it to us so we can reproduce it faithfully. Please note you will still need to upload the overall artwork to the shopping cart.">
+              <button class="help-button" type="button" aria-label="Artwork help: You can upload your artwork to the app to see a low resolution preview of where the panel joins will be placed. You can download an imposition and email it to us so we can reproduce it faithfully. Please note you will still need to upload the overall artwork to the shopping cart.">?</button>
+            </span>
+          </div>
           <button class="ghost-button compact" id="clear-artwork" type="button">Clear</button>
         </div>
         <p class="artwork-note">Please note that the artwork preview does not currently save. Please send us a screenshot if you want Vivad to adjust the artwork accordingly.</p>
@@ -285,7 +303,7 @@
     <script src="pdfjs/pdf.classic.js"></script>
     <script src="pdfjs/pdf.worker.classic.js"></script>
     <script
-      src="app.js?v=guided-configurator-remove-roll-pill-20260718"
+      src="app.js?v=guided-configurator-help-tooltips-20260718"
       data-apps-script-url="https://script.google.com/macros/s/AKfycbwN0Ocx_0jE9VD4nQLOAV9NaycPF9pRDe4Z3GmUTfLKWamcJjmz48MxdB7AQ6xlZrCu/exec"
     ></script>
   </body>

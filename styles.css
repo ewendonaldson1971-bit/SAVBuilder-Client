@@ -183,6 +183,79 @@ h2 {
   margin-bottom: 14px;
 }
 
+.heading-title,
+.section-heading h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.help-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.help-button {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  border: 1px solid #b8cbe0;
+  border-radius: 999px;
+  background: #f7fbff;
+  color: #1d5f9f;
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1;
+  cursor: help;
+  box-shadow: none;
+}
+
+.help-button:hover,
+.help-button:focus-visible {
+  border-color: #348ede;
+  background: #eaf4ff;
+  color: #174f86;
+  outline: none;
+}
+
+.help-tooltip::after {
+  content: attr(data-help);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 80;
+  width: min(320px, calc(100vw - 36px));
+  padding: 10px 12px;
+  border: 1px solid #b8cbe0;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 12px 28px rgba(83, 86, 90, 0.18);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s ease;
+  visibility: hidden;
+  white-space: normal;
+}
+
+.help-tooltip:hover::after,
+.help-tooltip:focus-within::after {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+
 .muted {
   color: var(--muted);
   font-size: 0.86rem;
@@ -473,7 +546,7 @@ h2 {
 }
 
 .advanced-config {
-  overflow: hidden;
+  overflow: visible;
   margin-top: 12px;
   border: 2px solid #348ede;
   border-radius: 8px;
