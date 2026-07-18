@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SAV Builder-Live</title>
-    <link rel="stylesheet" href="styles.css?v=imposition-email-20260718">
+    <link rel="stylesheet" href="styles.css?v=guided-configurator-advanced-20260718">
   </head>
   <body>
     <header class="app-header">
@@ -43,12 +43,14 @@
     <main class="app-shell">
       <section class="setup-panel surface" aria-labelledby="setup-title">
         <div class="section-heading">
-          <h2 id="setup-title">Job Setup</h2>
+          <h2 id="setup-title">Product Selector</h2>
         </div>
 
         <div class="setup-reset-row">
           <button class="ghost-button compact setup-reset-button" id="reset-survey" type="button">Reset</button>
         </div>
+
+        <div id="configurator-progress" class="configurator-progress" aria-label="Configurator progress"></div>
 
         <div class="product-search">
           <label class="field product-search-field">
@@ -80,34 +82,45 @@
 
         <div id="selector-survey" class="selector-survey"></div>
 
-        <div class="field">
-          <span>Bleed</span>
-          <div class="segmented" role="radiogroup" aria-label="Bleed type">
-            <label>
-              <input type="radio" name="bleed-type" value="none" checked>
-              <span>No bleed</span>
-            </label>
-            <label>
-              <input type="radio" name="bleed-type" value="all">
-              <span>All around</span>
-            </label>
-            <label>
-              <input type="radio" name="bleed-type" value="bottom-right">
-              <span>Bottom + right</span>
-            </label>
-          </div>
-        </div>
+        <details class="advanced-config">
+          <summary>
+            <span class="advanced-config-title">
+              <span class="advanced-config-icon" aria-hidden="true">+</span>
+              Bleed Options
+            </span>
+            <span id="advanced-config-status" class="advanced-config-status">Defaults</span>
+          </summary>
+          <div class="advanced-config-body">
+            <div class="field">
+              <span>Bleed</span>
+              <div class="segmented" role="radiogroup" aria-label="Bleed type">
+                <label>
+                  <input type="radio" name="bleed-type" value="none" checked>
+                  <span>No bleed</span>
+                </label>
+                <label>
+                  <input type="radio" name="bleed-type" value="all">
+                  <span>All around</span>
+                </label>
+                <label>
+                  <input type="radio" name="bleed-type" value="bottom-right">
+                  <span>Bottom + right</span>
+                </label>
+              </div>
+            </div>
 
-        <div class="input-grid">
-          <label class="field">
-            <span>Bleed mm</span>
-            <input id="bleed-mm" type="number" min="0" step="1" value="0">
-          </label>
-          <label class="field">
-            <span>Panel overlap mm</span>
-            <input id="overlap-mm" type="number" min="0" step="1" value="20">
-          </label>
-        </div>
+            <div class="input-grid">
+              <label class="field">
+                <span>Bleed mm</span>
+                <input id="bleed-mm" type="number" min="0" step="1" value="0">
+              </label>
+              <label class="field">
+                <span>Panel overlap mm</span>
+                <input id="overlap-mm" type="number" min="0" step="1" value="20">
+              </label>
+            </div>
+          </div>
+        </details>
 
       </section>
 
@@ -259,7 +272,7 @@
     <script src="pdfjs/pdf.classic.js"></script>
     <script src="pdfjs/pdf.worker.classic.js"></script>
     <script
-      src="app.js?v=add-to-cart-email-20260718"
+      src="app.js?v=guided-configurator-20260718"
       data-apps-script-url="https://script.google.com/macros/s/AKfycbwN0Ocx_0jE9VD4nQLOAV9NaycPF9pRDe4Z3GmUTfLKWamcJjmz48MxdB7AQ6xlZrCu/exec"
     ></script>
   </body>

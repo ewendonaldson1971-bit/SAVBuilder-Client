@@ -221,6 +221,8 @@
   function cacheUi() {
     ui.selectorSurvey = document.getElementById("selector-survey");
     ui.appTitle = document.getElementById("app-title");
+    ui.configuratorProgress = document.getElementById("configurator-progress");
+    ui.advancedConfigStatus = document.getElementById("advanced-config-status");
     ui.brandSelector = document.getElementById("brand-selector");
     ui.classSelector = document.getElementById("class-selector");
     ui.limitSelector = document.getElementById("limit-selector");
@@ -1107,6 +1109,8 @@
     state.selectedProduct = selectorState.product;
     renderProductSearch();
     renderSelectorSurvey(selectorState);
+    renderConfiguratorProgress(selectorState, parsed.elements);
+    renderAdvancedConfigStatus();
 
     if (!parsed.elements.length) {
       state.currentBest = null;
@@ -1502,6 +1506,72 @@
       if (value) state.selectorSelections[preservedColumn] = value;
     });
     validateSelectorSelections();
+  }
+
+  function renderConfiguratorProgress(selectorState, elements = []) {
+    if (!ui.configuratorProgress) return;
+    const product = selectorState.product || selectorState.previewProduct;
+    const hasProduct = Boolean(selectorState.product);
+    const hasElements = elements.length > 0;
+    const activeFilterCount = getActiveFilterCount();
+    const currentQuestion = selectorState.question
+      ? getDisplaySelectorColumn(selectorState.question.label)
+      : "Select";
+
+    const steps = [
+      {
+        label: "Surface",
+        value: state.mountingSurfaceFilter === MOUNTING_SURFACE_ALL
+          ? "All"
+          : getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, state.mountingSurfaceFilter),
+        status: "complete"
+      },
+      {
+        label: "Filters",
+        value: activeFilterCount ? `${activeFilterCount} active` : "Default",
+        status: activeFilterCount ? "complete" : "neutral"
+      },
+      {
+        label: "Product",
+        value: product?.name || currentQuestion,
+        status: hasProduct ? "complete" : "current"
+      },
+      {
+        label: "Data",
+        value: hasElements ? `${elements.length} ${elements.length === 1 ? "row" : "rows"}` : "No job",
+        status: hasElements ? "complete" : (hasProduct ? "current" : "pending")
+      },
+      {
+        label: "Result",
+        value: hasProduct && hasElements ? "Ready" : "Pending",
+        status: hasProduct && hasElements ? "complete" : "pending"
+      }
+    ];
+
+    ui.configuratorProgress.innerHTML = steps.map((step) => `
+      <span class="configurator-step ${escapeHtml(step.status)}">
+        <span>${escapeHtml(step.label)}</span>
+        <strong>${escapeHtml(step.value)}</strong>
+      </span>
+    `).join("");
+  }
+
+  function getActiveFilterCount() {
+    return [
+      state.brandFilter !== "all",
+      state.classFilter !== "all",
+      state.limitFilters.size > 0
+    ].filter(Boolean).length;
+  }
+
+  function renderAdvancedConfigStatus() {
+    if (!ui.advancedConfigStatus) return;
+    const bleedType = document.querySelector("input[name='bleed-type']:checked")?.value || "none";
+    const bleedMm = cleanNumber(ui.bleedMm?.value, 0);
+    const overlapMm = cleanNumber(ui.overlapMm?.value, 20);
+    const custom = bleedType !== "none" || bleedMm > 0 || Math.abs(overlapMm - 20) > 0.001;
+    ui.advancedConfigStatus.textContent = custom ? "Custom" : "Defaults";
+    ui.advancedConfigStatus.classList.toggle("custom", custom);
   }
 
   function isSyntheticSelectorColumn(column) {
@@ -3281,7 +3351,9 @@
     }
     const widestRoll = options.reduce((max, option) => Math.max(max, option.roll.printableWidth || option.roll.width), 0);
     const fitWarning = getStockFitWarning(best.maxUnrotatedPrintWidth, widestRoll);
+    const recommendationReason = getRecommendationReason(best, options);
     ui.costBreakdown.innerHTML = `
+      <div class="recommendation-line"><span>Recommendation</span><strong class="recommendation-copy">${escapeHtml(recommendationReason)}</strong></div>
       <div><span>Imposed length</span><strong>${formatNumber(best.costs.printLinearM, 2)} m</strong></div>
     `;
     renderArtworkFitWarning(fitWarning);
@@ -3291,6 +3363,22 @@
     renderOptions(options, best);
     renderPricing(best, elements);
     renderImposition(best);
+  }
+
+  function getRecommendationReason(best, options) {
+    if (!best) return "Select product and data.";
+    if (best.offsetJoinsUsed) return "Offset joins reduce the imposed length.";
+    if (best.joins > 0) return "Best compatible stock; the job will be panelled.";
+
+    const cheapest = options.slice().sort((a, b) =>
+      a.costs.total - b.costs.total ||
+      a.roll.width - b.roll.width
+    )[0];
+
+    if (cheapest === best) return "Lowest-cost compatible roll.";
+    if (cheapest && best.joins < cheapest.joins) return "Fewer joins than the cheapest roll.";
+    if (best.unrotatedFitsAll && cheapest && !cheapest.unrotatedFitsAll) return "Fits the widest entered print size.";
+    return "Best ranked compatible roll.";
   }
 
   function getStockFitWarning(requiredWidth, widestRoll) {

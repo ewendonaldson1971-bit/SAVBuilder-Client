@@ -294,6 +294,136 @@ h2 {
   color: #fff;
 }
 
+.configurator-progress {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 14px;
+}
+
+.configurator-step {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  min-height: 45px;
+  padding: 6px 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+}
+
+.configurator-step span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.configurator-step strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.configurator-step.complete {
+  border-color: var(--brand-blue-soft);
+  background: #f7fbff;
+}
+
+.configurator-step.current {
+  border-color: #348ede;
+  background: #eaf4ff;
+  box-shadow: 0 0 0 3px rgba(52, 142, 222, 0.10);
+}
+
+.configurator-step.pending {
+  opacity: 0.68;
+}
+
+.advanced-config {
+  overflow: hidden;
+  margin-top: 12px;
+  border: 2px solid #348ede;
+  border-radius: 8px;
+  background: #eaf4ff;
+  box-shadow: 0 0 0 3px rgba(52, 142, 222, 0.10);
+}
+
+.advanced-config summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 46px;
+  padding: 9px 11px;
+  color: #1d5f9f;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.advanced-config summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-config-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.advanced-config-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #348ede;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+  transition: transform 0.16s ease;
+}
+
+.advanced-config[open] .advanced-config-icon {
+  transform: rotate(45deg);
+}
+
+.advanced-config-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #fff;
+  color: #1d5f9f;
+  font-size: 0.72rem;
+  font-weight: 850;
+  border: 1px solid var(--brand-blue-soft);
+}
+
+.advanced-config-status.custom {
+  background: #348ede;
+  border-color: #348ede;
+  color: #fff;
+}
+
+.advanced-config-body {
+  display: grid;
+  gap: 0;
+  padding: 10px;
+  border-top: 1px solid rgba(52, 142, 222, 0.35);
+  background: #fff;
+}
+
 .brand-filter,
 .class-filter,
 .limit-filter,
@@ -989,6 +1119,16 @@ textarea:focus {
   white-space: nowrap;
 }
 
+.breakdown .recommendation-line {
+  align-items: flex-start;
+}
+
+.breakdown .recommendation-copy {
+  line-height: 1.25;
+  text-align: right;
+  white-space: normal;
+}
+
 .results-panel .metric strong {
   margin-top: 2px;
   font-size: clamp(0.92rem, 1.35vw, 1.16rem);
@@ -1495,6 +1635,10 @@ tbody tr.selected-row {
 
   .header-actions .imposition-actions button {
     flex: 0 0 auto;
+  }
+
+  .configurator-progress {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .app-shell {
