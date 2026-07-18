@@ -81,6 +81,22 @@
   const PRINT_MODE_COLUMN = "Print Mode";
   const SURFACE_DESCRIPTION_COLUMN = "Surface Description";
   const SURFACE_LINK_COLUMN = "Surface Link";
+  const PRODUCT_SPEC_SHEET_COLUMNS = [
+    "Product Spec Sheet",
+    "Product Spec Sheet Link",
+    "Product PDF",
+    "Product PDF Link",
+    "Product Data Sheet",
+    "Product Datasheet"
+  ];
+  const LAMINATE_SPEC_SHEET_COLUMNS = [
+    "Laminate Spec Sheet",
+    "Laminate Spec Sheet Link",
+    "Laminate PDF",
+    "Laminate PDF Link",
+    "Laminate Data Sheet",
+    "Laminate Datasheet"
+  ];
   const DERIVED_PERFORATION_COLUMN = "Perforation";
   const CART_WINDOW_NAME = "savBuilderCart";
   const CART_NAVIGATION_DELAY_MS = 1200;
@@ -228,6 +244,8 @@
     ui.optionsBody = document.getElementById("options-body");
     ui.priceSummary = document.getElementById("price-summary");
     ui.addAllCart = document.getElementById("add-all-cart");
+    ui.fixedAddAllCart = document.getElementById("fixed-add-all-cart");
+    ui.addAllCartButtons = [ui.addAllCart, ui.fixedAddAllCart].filter(Boolean);
     ui.pricingBody = document.getElementById("pricing-body");
     ui.impositionSummary = document.getElementById("imposition-summary");
     ui.impositionPreview = document.getElementById("imposition-preview");
@@ -440,7 +458,9 @@
     });
 
     ui.downloadImposition.addEventListener("click", downloadImposition);
-    ui.addAllCart.addEventListener("click", addAllToCart);
+    ui.addAllCartButtons.forEach((button) => {
+      button.addEventListener("click", addAllToCart);
+    });
   }
 
   function resetSurveyAndFilters() {
@@ -1385,15 +1405,13 @@
       }))
     ];
 
-    ui.mountingSurfaceSelector.innerHTML = options.map((option) => {
-      const checked = option.value === state.mountingSurfaceFilter;
-      return `
-        <label class="mounting-option${checked ? " selected" : ""}">
-          <input type="radio" name="mounting-surface-filter" value="${escapeHtml(option.value)}" data-mounting-surface-filter="${escapeHtml(option.value)}" ${checked ? "checked" : ""}>
-          <span>${escapeHtml(option.label)}</span>
-        </label>
-      `;
-    }).join("");
+    ui.mountingSurfaceSelector.innerHTML = `
+      <select class="mounting-surface-select" id="mounting-surface-filter" data-mounting-surface-filter>
+        ${options.map((option) => `
+          <option value="${escapeHtml(option.value)}" ${option.value === state.mountingSurfaceFilter ? "selected" : ""}>${escapeHtml(option.label)}</option>
+        `).join("")}
+      </select>
+    `;
   }
 
   function getAvailableMountingSurfaceChoices() {
@@ -1642,6 +1660,8 @@
     const mountingSurfaces = getDistinctValues(productRows, MOUNTING_SURFACE_COLUMN);
     const longevities = getDistinctValues(productRows, LONGEVITY_COLUMN);
     const laminates = getSortedSelectorChoices(productRows, LAMINATE_COLUMN);
+    const productSpecSheet = getFirstRowValueForColumns(productRows, PRODUCT_SPEC_SHEET_COLUMNS);
+    const laminateSpecSheet = getFirstRowValueForColumns(productRows, LAMINATE_SPEC_SHEET_COLUMNS);
 
     return {
       name: productName.trim(),
@@ -1654,9 +1674,21 @@
       mountingSurfaces,
       longevities,
       laminates,
+      productSpecSheet,
+      laminateSpecSheet,
       selectorRow: productRows[0],
       selectorSelections: { ...selections }
     };
+  }
+
+  function getFirstRowValueForColumns(rows, columns) {
+    for (const row of rows) {
+      for (const column of columns) {
+        const value = String(getRowValueForColumn(row, column) || "").trim();
+        if (value) return value;
+      }
+    }
+    return "";
   }
 
   function getProductSurfaceInfos(productRows) {
@@ -1829,9 +1861,10 @@
     const evenPack = packGroupsBestFit(evenGroups, printableWidth, "nested");
     const offsetPack = packGroupsBestFit(offsetGroups, printableWidth, "offset");
     const offsetSaves = offsetPack.lengthMm + 0.1 < evenPack.lengthMm;
-    const selectedPack = settings.useOffsetJoins === true && offsetSaves ? offsetPack : evenPack;
-    const elementPlans = settings.useOffsetJoins === true && offsetSaves ? offsetElementPlans : evenElementPlans;
-    const groups = settings.useOffsetJoins === true && offsetSaves ? offsetGroups : evenGroups;
+    const offsetJoinsUsed = settings.useOffsetJoins === true && offsetSaves;
+    const selectedPack = offsetJoinsUsed ? offsetPack : evenPack;
+    const elementPlans = offsetJoinsUsed ? offsetElementPlans : evenElementPlans;
+    const groups = offsetJoinsUsed ? offsetGroups : evenGroups;
     const joins = elementPlans.reduce((total, plan) => total + plan.joins, 0);
     const costs = calculateCosts(selectedPack, pricedRoll, elements, product.printSqmRate);
 
@@ -1847,6 +1880,7 @@
       evenPack,
       offsetPack,
       offsetSaves,
+      offsetJoinsUsed,
       selectedPack,
       joins,
       unrotatedFitsAll,
@@ -2558,6 +2592,7 @@
       .filter((header) => !isLegacySurfaceSideColumn(header))
       .filter((header) => !isPrintModeColumnName(header))
       .filter((header) => !isPerforationColumnName(header))
+      .filter((header) => !isSpecSheetColumnName(header))
       .filter((header) => !isWizardExcludedColumnName(header))
       .filter((header) => !isSurfaceMetadataColumnName(header))
       .filter((header) => !mountingSurfaceMatrixHeaderSet.has(header))
@@ -2571,6 +2606,7 @@
         .filter((header) => !isLegacySurfaceSideColumn(header))
         .filter((header) => !isPrintModeColumnName(header))
         .filter((header) => !isPerforationColumnName(header))
+        .filter((header) => !isSpecSheetColumnName(header))
         .filter((header) => !isWizardExcludedColumnName(header))
         .filter((header) => !isSurfaceMetadataColumnName(header))
         .filter((header) => header && isPostProductSelectorColumn(header))
@@ -2751,6 +2787,7 @@
       !isLegacySurfaceSideColumn(header) &&
       !isPrintModeColumnName(header) &&
       !isPerforationColumnName(header) &&
+      !isSpecSheetColumnName(header) &&
       !isIgnoredSelectorDataColumn(header) &&
       !isPrintRateColumnName(header);
   }
@@ -2786,6 +2823,12 @@
 
   function isSurfaceMetadataColumnName(header) {
     return isSurfaceDescriptionColumnName(header) || isSurfaceLinkColumnName(header);
+  }
+
+  function isSpecSheetColumnName(header) {
+    const key = normalizeKey(header);
+    return PRODUCT_SPEC_SHEET_COLUMNS.concat(LAMINATE_SPEC_SHEET_COLUMNS)
+      .some((column) => key === normalizeKey(column));
   }
 
   function isSurfaceDescriptionColumnName(header) {
@@ -3120,7 +3163,7 @@
     ui.optionsBody.innerHTML = "";
     ui.pricingBody.innerHTML = "";
     state.currentCartUrls = [];
-    ui.addAllCart.disabled = true;
+    setAddAllCartButtonsDisabled(true);
     ui.optionCount.textContent = "";
     ui.priceSummary.textContent = "";
     ui.impositionSummary.textContent = "";
@@ -3142,7 +3185,7 @@
     ui.optionsBody.innerHTML = "";
     ui.pricingBody.innerHTML = "";
     state.currentCartUrls = [];
-    ui.addAllCart.disabled = true;
+    setAddAllCartButtonsDisabled(true);
     ui.optionCount.textContent = "";
     ui.priceSummary.textContent = "";
     ui.impositionSummary.textContent = "";
@@ -3179,6 +3222,7 @@
         ${renderProductPrintMode(product)}
         ${renderProductLongevity(product)}
         ${renderProductMountingSurfaces(product)}
+        ${renderProductSpecSheetLinks(product)}
         ${renderProductSurfaceInfo(product)}
       </div>
     ` : (!selectorState.question ? `<div class="survey-empty">${escapeHtml(getSelectorEmptyMessage(selectorState))}</div>` : "");
@@ -3303,6 +3347,36 @@
     if (!laminates.length) return "";
     const label = laminates.length === 1 ? "Laminate" : "Laminates";
     return `<div class="muted">${escapeHtml(`${label}: ${laminates.join(", ")}`)}</div>`;
+  }
+
+  function renderProductSpecSheetLinks(product) {
+    const links = [
+      { label: "Product spec sheet", url: normalizePreviewUrl(product.productSpecSheet) },
+      { label: "Laminate spec sheet", url: normalizePreviewUrl(product.laminateSpecSheet) }
+    ].filter((link) => link.url);
+
+    if (!links.length) return "";
+
+    return `
+      <div class="product-spec-links">
+        ${links.map((link) => `
+          <a class="product-spec-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener">
+            ${renderPdfIcon()}
+            <span>${escapeHtml(link.label)}</span>
+          </a>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderPdfIcon() {
+    return `
+      <svg class="pdf-icon" aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M6 2h8l4 4v16H6z"></path>
+        <path d="M14 2v5h5"></path>
+        <text x="12" y="17" text-anchor="middle">PDF</text>
+      </svg>
+    `;
   }
 
   function renderProductLongevity(product) {
@@ -3737,7 +3811,7 @@
       const unit = element.quantity > 0 ? lineTotal / element.quantity : 0;
       const printSize = `${formatNumber(plan.printWidth, 0)} x ${formatNumber(plan.printHeight, 0)} mm${plan.rotated ? " rotated" : ""}`;
       const dropsText = plan.drops > 1 ? `${formatInteger(plan.drops)} vertical` : formatInteger(plan.drops);
-      const cartUrl = buildCartUrl(best.roll, element, unit, best.printMode);
+      const cartUrl = buildCartUrl(best.roll, element, unit, best.printMode, best.offsetJoinsUsed);
       if (cartUrl) cartUrls.push(cartUrl);
       return `
         <tr>
@@ -3754,39 +3828,40 @@
       `;
     }).join("");
     state.currentCartUrls = cartUrls;
-    ui.addAllCart.disabled = !cartUrls.length;
+    setAddAllCartButtonsDisabled(!cartUrls.length);
   }
 
-  function buildCartUrl(roll, element, unitPrice, printMode = "") {
+  function buildCartUrl(roll, element, unitPrice, printMode = "", offsetJoinsUsed = false) {
     if (!roll || !roll.qcode) return "";
     const params = new URLSearchParams({
       qcode: roll.qcode,
       quantity: String(element.quantity),
       width: String(Math.round(element.width)),
       height: String(Math.round(element.height)),
-      shortname: getCartShortname(element.shortname, printMode),
+      shortname: getCartShortname(element.shortname, printMode, offsetJoinsUsed),
       price: formatCartPrice(unitPrice)
     });
     return `https://vivad.com.au/shopping-cart?${params.toString()}`;
   }
 
-  function getCartShortname(shortname, printMode) {
+  function getCartShortname(shortname, printMode, offsetJoinsUsed = false) {
     const base = String(shortname || "").trim();
     const mode = String(printMode || "").trim();
-    return mode ? `${base} - ${mode}` : base;
+    const labelled = mode ? `${base} - ${mode}` : base;
+    return offsetJoinsUsed ? `${labelled}-OSJ` : labelled;
   }
 
   async function addAllToCart() {
     const urls = state.currentCartUrls.slice();
     if (!urls.length) return;
 
-    ui.addAllCart.disabled = true;
-    const originalLabel = ui.addAllCart.textContent;
+    const originalLabels = new Map(ui.addAllCartButtons.map((button) => [button, button.textContent]));
+    setAddAllCartButtonsDisabled(true);
     let cartWindow = window.open(urls[0], CART_WINDOW_NAME);
 
     try {
       for (let index = 0; index < urls.length; index += 1) {
-        ui.addAllCart.textContent = `Adding ${index + 1}/${urls.length}`;
+        setAddAllCartButtonsText(`Adding ${index + 1}/${urls.length}`);
         if (index > 0) {
           await wait(CART_NAVIGATION_DELAY_MS);
           cartWindow = navigateCartTab(urls[index], cartWindow);
@@ -3794,9 +3869,23 @@
       }
     } finally {
       await wait(250);
-      ui.addAllCart.textContent = originalLabel;
-      ui.addAllCart.disabled = !state.currentCartUrls.length;
+      ui.addAllCartButtons.forEach((button) => {
+        button.textContent = originalLabels.get(button) || "Add all to cart";
+      });
+      setAddAllCartButtonsDisabled(!state.currentCartUrls.length);
     }
+  }
+
+  function setAddAllCartButtonsDisabled(disabled) {
+    (ui.addAllCartButtons || []).forEach((button) => {
+      button.disabled = disabled;
+    });
+  }
+
+  function setAddAllCartButtonsText(text) {
+    (ui.addAllCartButtons || []).forEach((button) => {
+      button.textContent = text;
+    });
   }
 
   function navigateCartTab(url, cartWindow) {

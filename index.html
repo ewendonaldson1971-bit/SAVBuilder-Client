@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SAV Builder-Live</title>
-    <link rel="stylesheet" href="styles.css?v=remove-perforation-selector-20260712">
+    <link rel="stylesheet" href="styles.css?v=compact-properties-surface-20260718">
   </head>
   <body>
     <header class="app-header">
@@ -65,13 +65,13 @@
         </div>
 
         <div class="limit-filter" aria-labelledby="limit-filter-title">
-          <span id="limit-filter-title">Limit to:</span>
+          <span id="limit-filter-title">Properties:</span>
           <div id="limit-selector" class="limit-selector" aria-label="Product property filters"></div>
         </div>
 
         <div class="mounting-filter" aria-labelledby="mounting-filter-title">
           <span id="mounting-filter-title">Mounting Surface</span>
-          <div id="mounting-surface-selector" class="mounting-surface-selector" role="radiogroup" aria-label="Mounting surface filter"></div>
+          <div id="mounting-surface-selector" class="mounting-surface-selector" aria-label="Mounting surface filter"></div>
         </div>
 
         <div id="selector-survey" class="selector-survey"></div>
@@ -168,7 +168,10 @@
       <section class="results-panel surface" aria-labelledby="results-title">
         <div class="section-heading">
           <h2 id="results-title">Recommendation</h2>
-          <span id="roll-choice" class="status-pill positive">Ready</span>
+          <div class="recommendation-actions">
+            <span id="roll-choice" class="status-pill positive">Ready</span>
+            <button class="primary-button compact recommendation-cart-button" id="fixed-add-all-cart" type="button" disabled>Add all to cart</button>
+          </div>
         </div>
 
         <div class="metric-grid">
@@ -185,7 +188,7 @@
             <strong id="metric-price">$0.00</strong>
           </div>
           <div class="metric">
-            <span>Amortised rate</span>
+            <span>SQM Rate</span>
             <strong id="metric-rate">$0.00 / sqm</strong>
           </div>
         </div>
@@ -255,7 +258,7 @@
     <script src="pdfjs/pdf.classic.js"></script>
     <script src="pdfjs/pdf.worker.classic.js"></script>
     <script
-      src="app.js?v=element-shortname-after-height-20260712"
+      src="app.js?v=compact-properties-surface-20260718"
       data-apps-script-url="https://script.google.com/macros/s/AKfycbx_jQXFd-p0vFseuUzI7dxTfLOZFJWKD5JZb66QfCj8UCLHe645027F95PVK7ktYHC1/exec"
     ></script>
   </body>
