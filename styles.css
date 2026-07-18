@@ -374,6 +374,7 @@ h2 {
 
 .product-search,
 .filters-panel,
+.selector-survey,
 .input-panel,
 .results-panel,
 .wide-panel {
@@ -396,14 +397,42 @@ h2 {
 }
 
 .configurator-guidance {
+  overflow: hidden;
   display: grid;
-  gap: 3px;
+  gap: 0;
   margin: -4px 0 14px;
-  padding: 10px 12px;
   border: 1px solid var(--brand-blue-soft);
   border-left: 4px solid #348ede;
   border-radius: 8px;
   background: #f7fbff;
+}
+
+.configurator-guidance-button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-height: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.configurator-guidance-button:hover:not(:disabled) {
+  background: rgba(52, 142, 222, 0.08);
+}
+
+.configurator-guidance-button:focus-visible {
+  outline: 3px solid rgba(52, 142, 222, 0.35);
+  outline-offset: -3px;
+}
+
+.configurator-guidance-button:disabled {
+  cursor: default;
 }
 
 .configurator-guidance-kicker {

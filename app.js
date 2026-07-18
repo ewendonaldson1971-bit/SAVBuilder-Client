@@ -287,6 +287,7 @@
     ui.productSearch.addEventListener("input", handleProductSearchInput);
 
     ui.configuratorProgress.addEventListener("click", handleConfiguratorProgressClick);
+    ui.configuratorGuidance.addEventListener("click", handleConfiguratorGuidanceClick);
 
     ui.productSearchResults.addEventListener("click", (event) => {
       const result = event.target.closest("[data-product-search-index]");
@@ -544,6 +545,12 @@
     goToConfiguratorTarget(step.dataset.configuratorTarget);
   }
 
+  function handleConfiguratorGuidanceClick(event) {
+    const button = event.target.closest("[data-configurator-guidance-target]");
+    if (!button || button.disabled) return;
+    goToConfiguratorTarget(button.dataset.configuratorGuidanceTarget);
+  }
+
   function goToConfiguratorTarget(target) {
     const targetElements = getConfiguratorTargetElements(target);
     if (!targetElements?.scrollTarget) return;
@@ -588,6 +595,13 @@
       return {
         scrollTarget: ui.filtersPanel,
         focusTarget: getFirstFocusableElement(ui.filtersPanel)
+      };
+    }
+
+    if (target === "selector") {
+      return {
+        scrollTarget: ui.selectorSurvey,
+        focusTarget: getFirstFocusableElement(ui.selectorSurvey)
       };
     }
 
@@ -1706,37 +1720,47 @@
     let title = "Choose a product";
     let body = "Use product search, mounting surface, brand, class and properties to narrow the available SAVs.";
     let status = "current";
+    let target = "product";
+    let disabled = false;
 
     if (!selectorState.hasRows) {
       title = "Loading product data";
       body = "The selector is waiting for the Apps Script product feed.";
       status = "pending";
+      disabled = true;
     } else if (!selectorState.candidates.length) {
       title = "No results found";
       body = "Clear filters or broaden the selection to see matching SAV products.";
+      target = "filters";
     } else if (!hasProduct && selectorState.question) {
       const question = getDisplaySelectorColumn(selectorState.question.label);
       const count = selectorState.completeProductCount || selectorState.candidates.length;
       title = `Choose ${question}`;
       body = `${formatInteger(count)} matching ${count === 1 ? "product" : "products"} remain. Search can still jump straight to a product, QCode or mounting surface.`;
+      target = "selector";
     } else if (!hasProduct) {
       title = "Choose a product";
       body = "Adjust the filters or use search to find the SAV before calculating the job.";
+      target = "product";
     } else if (!hasElements) {
       title = "Enter job sizes";
       body = `${product?.name || "The product"} is selected. Add quantity, width, height and shortname in Data Entry to calculate the roll.`;
       status = "current";
+      target = "data";
     } else if (best) {
       title = "Review the recommendation";
       body = `${best.productName} is selected on ${getRollChoiceLabel(best.roll)} at ${formatMoney(best.costs.rate)} / sqm. Stock Options shows the available alternatives.`;
       status = "complete";
+      target = "result";
     }
 
-    ui.configuratorGuidance.className = `configurator-guidance ${status}`;
+    ui.configuratorGuidance.className = `configurator-guidance ${status}${disabled ? " disabled" : ""}`;
     ui.configuratorGuidance.innerHTML = `
-      <span class="configurator-guidance-kicker">Next action</span>
-      <strong>${escapeHtml(title)}</strong>
-      <span>${escapeHtml(body)}</span>
+      <button class="configurator-guidance-button" type="button" data-configurator-guidance-target="${escapeHtml(target)}"${disabled ? " disabled" : ""}>
+        <span class="configurator-guidance-kicker">Next action</span>
+        <strong>${escapeHtml(title)}</strong>
+        <span>${escapeHtml(body)}</span>
+      </button>
     `;
   }
 
