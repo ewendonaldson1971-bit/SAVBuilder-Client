@@ -1,10 +1,14 @@
 const PROPERTY_KEYS = {
   liveSpreadsheetId: "LIVE_SPREADSHEET_ID",
-  devSpreadsheetId: "DEV_SPREADSHEET_ID",
   openSheetPassword: "OPEN_SHEET_PASSWORD"
 };
 
 const ALLOWED_SHEETS = ["Selector", "Config"];
+const DEFAULT_DEV_SELECTOR_SHEET_NAME = "DEV";
+const IMPOSITION_EMAIL_TO = "sales@vivad.com.au";
+const IMPOSITION_EMAIL_SUBJECT = "SavBuilder imposition submitted";
+const IMPOSITION_EMAIL_ACTION = "email-imposition";
+const MAX_IMPOSITION_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
 function doGet(event) {
   const params = event && event.parameter ? event.parameter : {};
@@ -21,6 +25,30 @@ function doGet(event) {
   }
 
   return writePayload(payload, callback);
+}
+
+function doPost(event) {
+  const params = event && event.parameter ? event.parameter : {};
+  let payload;
+
+  try {
+    const action = String(params.action || "").trim().toLowerCase();
+    if (action === IMPOSITION_EMAIL_ACTION) {
+      payload = handleImpositionEmail(params);
+    } else {
+      payload = {
+        ok: false,
+        error: "Unsupported Apps Script POST action."
+      };
+    }
+  } catch (error) {
+    payload = {
+      ok: false,
+      error: error && error.message ? error.message : "Apps Script request failed."
+    };
+  }
+
+  return writePayload(payload, "");
 }
 
 function handleRequest(params) {
@@ -43,6 +71,43 @@ function handleRequest(params) {
   };
 }
 
+function handleImpositionEmail(params) {
+  const svg = String(params.svg || "");
+  if (!svg.trim()) throw new Error("No imposition file was received.");
+  if (Utilities.newBlob(svg).getBytes().length > MAX_IMPOSITION_ATTACHMENT_BYTES) {
+    throw new Error("Imposition file is too large to email.");
+  }
+
+  const filename = getSafeAttachmentName(params.filename || "sav-builder-imposition.svg");
+  const productName = String(params.productName || "").trim();
+  const rollWidth = String(params.rollWidth || "").trim();
+  const total = String(params.total || "").trim();
+  const mode = getMode(params.mode);
+
+  const body = [
+    "SAV Builder imposition submitted.",
+    "",
+    productName ? `Product: ${productName}` : "",
+    rollWidth ? `Roll width: ${rollWidth} mm` : "",
+    total ? `Total: ${total}` : "",
+    `Mode: ${mode}`
+  ].filter(Boolean).join("\n");
+
+  MailApp.sendEmail({
+    to: IMPOSITION_EMAIL_TO,
+    subject: IMPOSITION_EMAIL_SUBJECT,
+    body,
+    name: "SAV Builder",
+    attachments: [
+      Utilities.newBlob(svg, "image/svg+xml", filename)
+    ]
+  });
+
+  return {
+    ok: true
+  };
+}
+
 function getOpenSheetPayload(mode, password, sheetName) {
   const properties = PropertiesService.getScriptProperties();
   const expectedPassword = properties.getProperty(PROPERTY_KEYS.openSheetPassword);
@@ -60,9 +125,18 @@ function getOpenSheetPayload(mode, password, sheetName) {
   };
 }
 
+function getSafeAttachmentName(value) {
+  const cleaned = String(value || "")
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+  const filename = cleaned || "sav-builder-imposition.svg";
+  return /\.svg$/i.test(filename) ? filename : `${filename}.svg`;
+}
+
 function getSpreadsheetId(mode) {
   const properties = PropertiesService.getScriptProperties();
-  const key = mode === "dev" ? PROPERTY_KEYS.devSpreadsheetId : PROPERTY_KEYS.liveSpreadsheetId;
+  const key = PROPERTY_KEYS.liveSpreadsheetId;
   const id = properties.getProperty(key);
   if (!id) throw new Error(`${key} is not configured.`);
   if (!/^[A-Za-z0-9_-]{20,}$/.test(id)) {
@@ -76,13 +150,14 @@ function getWorksheet(spreadsheet, mode, logicalSheetName) {
   const prefix = `${mode.toUpperCase()}_${logicalSheetName.toUpperCase()}`;
   const configuredName = properties.getProperty(`${prefix}_SHEET_NAME`);
   const configuredGid = properties.getProperty(`${prefix}_SHEET_GID`);
+  const defaultSheetName = getDefaultWorksheetName(mode, logicalSheetName);
 
   if (configuredName) {
     const namedSheet = spreadsheet.getSheetByName(configuredName);
     if (namedSheet) return namedSheet;
   }
 
-  const defaultSheet = spreadsheet.getSheetByName(logicalSheetName);
+  const defaultSheet = spreadsheet.getSheetByName(defaultSheetName);
   if (defaultSheet) return defaultSheet;
 
   if (configuredGid) {
@@ -92,6 +167,13 @@ function getWorksheet(spreadsheet, mode, logicalSheetName) {
   }
 
   throw new Error(`${logicalSheetName} sheet was not found for ${mode}.`);
+}
+
+function getDefaultWorksheetName(mode, logicalSheetName) {
+  if (mode === "dev" && logicalSheetName === "Selector") {
+    return DEFAULT_DEV_SELECTOR_SHEET_NAME;
+  }
+  return logicalSheetName;
 }
 
 function getRequestedSheetName(value) {

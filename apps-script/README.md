@@ -10,11 +10,10 @@ This Apps Script hides the Google Sheet IDs from the browser. The browser only c
 
 | Property | Required | Purpose |
 | --- | --- | --- |
-| `LIVE_SPREADSHEET_ID` | Yes | Live SAV Builder spreadsheet ID. |
-| `DEV_SPREADSHEET_ID` | Yes | DEV SAV Builder spreadsheet ID. |
+| `LIVE_SPREADSHEET_ID` | Yes | Live SAV Builder spreadsheet ID. Both live and dev mode read from this spreadsheet. |
 | `OPEN_SHEET_PASSWORD` | Yes | Password required before the app opens the Sheet. |
 | `LIVE_SELECTOR_SHEET_NAME` | No | Live Selector tab name if it is not `Selector`. |
-| `DEV_SELECTOR_SHEET_NAME` | No | DEV Selector tab name if it is not `Selector`. |
+| `DEV_SELECTOR_SHEET_NAME` | No | DEV Selector tab name if it is not `DEV`. |
 | `LIVE_CONFIG_SHEET_NAME` | No | Live Config tab name if it is not `Config`. |
 | `DEV_CONFIG_SHEET_NAME` | No | DEV Config tab name if it is not `Config`. |
 | `LIVE_SELECTOR_SHEET_GID` | No | Live Selector tab gid if name matching is not suitable. |
@@ -25,6 +24,7 @@ This Apps Script hides the Google Sheet IDs from the browser. The browser only c
 4. Deploy as a Web App:
    - Execute as: **Me**
    - Who has access: **Anyone**
+   - Deploy and authorize this while signed in as **Vivad1958@gmail.com** so imposition emails are sent by that Google account.
 5. Copy the Web App URL into the `data-apps-script-url` attribute on the `app.js` script tag near the end of `index.html`:
 
 ```html
@@ -36,8 +36,12 @@ This Apps Script hides the Google Sheet IDs from the browser. The browser only c
 
 The public app can still see the Apps Script Web App URL, but it cannot see the Google Sheet IDs or the open-sheet password.
 
+## Imposition email
+
+The app can submit the generated imposition SVG to Apps Script. `Code.gs` sends it to `sales@vivad.com.au` with the subject `SavBuilder imposition submitted` using `MailApp.sendEmail`. The first deployment or update may ask the Vivad1958 Google account to authorize email sending.
+
 ## Troubleshooting
 
 If the Web App URL returns `Script function not found: doGet`, the deployment is not running the `Code.gs` in this folder. Paste this `Code.gs` into the Apps Script project, save it, then create a new Web App deployment or edit the existing deployment to use a new version.
 
-If the Web App URL returns `Illegal spreadsheet id or key: Yes`, check the Script Properties. `LIVE_SPREADSHEET_ID` and `DEV_SPREADSHEET_ID` must be the long ID from the Google Sheet URL, not `Yes`, a tab name, or a sharing flag.
+If the Web App URL returns `Illegal spreadsheet id or key: Yes`, check the Script Properties. `LIVE_SPREADSHEET_ID` must be the long ID from the Google Sheet URL, not `Yes`, a tab name, or a sharing flag.

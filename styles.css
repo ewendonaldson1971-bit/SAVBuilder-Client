@@ -15,8 +15,8 @@
   --brand-green-soft: #e8f2df;
   --brand-red-soft: #fde8ec;
   --shadow: 0 14px 34px rgba(83, 86, 90, 0.12);
-  --recommendation-panel-space: clamp(145px, 18vh, 190px);
-  --recommendation-panel-offset: clamp(8px, 1.8vw, 18px);
+  --recommendation-panel-space: clamp(92px, 12vh, 128px);
+  --recommendation-panel-offset: clamp(6px, 1.2vw, 12px);
 }
 
 * {
@@ -107,6 +107,24 @@ h2 {
   justify-content: flex-end;
 }
 
+.imposition-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.header-action-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.header-actions .icon-button {
+  width: 40px;
+  min-width: 40px;
+}
+
 .pricing-actions {
   display: flex;
   align-items: center;
@@ -151,7 +169,7 @@ h2 {
   right: clamp(10px, 2.4vw, 28px);
   bottom: var(--recommendation-panel-offset);
   z-index: 30;
-  padding: 10px 12px;
+  padding: 7px 10px;
   max-height: calc(var(--recommendation-panel-space) - var(--recommendation-panel-offset));
   overflow-y: auto;
   border-color: #348ede;
@@ -257,7 +275,7 @@ h2 {
 
 .setup-reset-row {
   display: flex;
-  justify-content: flex-start;
+  justify-content: flex-end;
   margin: 0 0 14px;
 }
 
@@ -575,10 +593,10 @@ h2 {
 .product-spec-link {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  width: fit-content;
+  justify-content: center;
+  width: 34px;
   min-height: 32px;
-  padding: 5px 9px;
+  padding: 5px;
   border: 1px solid var(--brand-blue-soft);
   border-radius: 7px;
   background: #fff;
@@ -691,12 +709,6 @@ h2 {
   max-height: 240px;
   object-fit: contain;
   background: #fff;
-}
-
-.image-preview-caption {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
 }
 
 .og-preview-body {
@@ -927,27 +939,28 @@ textarea:focus {
   gap: 10px;
 }
 
-.results-panel .section-heading {
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
 .recommendation-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 7px;
   min-width: 0;
 }
 
+.recommendation-actions .status-pill,
+.recommendation-actions .recommendation-cart-button {
+  white-space: nowrap;
+}
+
 .results-panel .metric-grid {
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(105px, 1fr)) minmax(220px, auto);
+  gap: 6px;
+  align-items: stretch;
 }
 
 .results-panel .metric {
-  padding: 7px 9px;
+  padding: 6px 8px;
 }
 
 .metric strong {
@@ -971,29 +984,23 @@ textarea:focus {
   font-size: 0.86rem;
 }
 
-.breakdown .fit-warning {
-  display: block;
-  padding: 9px 10px;
-  border: 1px solid var(--coral);
-  border-radius: 8px;
-  background: #fff3f1;
-  color: var(--green-dark);
-  line-height: 1.35;
-  font-weight: 700;
-}
-
 .breakdown strong {
   color: var(--ink);
   white-space: nowrap;
 }
 
 .results-panel .metric strong {
-  font-size: clamp(0.98rem, 1.5vw, 1.28rem);
+  margin-top: 2px;
+  font-size: clamp(0.92rem, 1.35vw, 1.16rem);
 }
 
 .results-panel .breakdown {
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 6px;
+  padding-top: 6px;
+}
+
+.results-panel .breakdown:empty {
+  display: none;
 }
 
 button,
@@ -1142,6 +1149,18 @@ button:disabled {
   display: grid;
   gap: 8px;
   margin-top: 12px;
+}
+
+.artwork-fit-warning {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--coral);
+  border-radius: 8px;
+  background: #fff3f1;
+  color: var(--green-dark);
+  font-size: 0.86rem;
+  line-height: 1.35;
+  font-weight: 700;
 }
 
 .artwork-empty {
@@ -1440,6 +1459,10 @@ tbody tr.selected-row {
 }
 
 @media (max-width: 760px) {
+  :root {
+    --recommendation-panel-space: 126px;
+  }
+
   .app-header {
     align-items: flex-start;
     flex-direction: column;
@@ -1465,6 +1488,15 @@ tbody tr.selected-row {
     flex: 1;
   }
 
+  .imposition-actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+
+  .header-actions .imposition-actions button {
+    flex: 0 0 auto;
+  }
+
   .app-shell {
     grid-template-columns: 1fr;
     padding-inline: 10px;
@@ -1485,7 +1517,24 @@ tbody tr.selected-row {
   }
 
   .results-panel .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .results-panel .metric {
+    padding: 5px 4px;
+  }
+
+  .results-panel .metric span {
+    font-size: 0.68rem;
+  }
+
+  .results-panel .metric strong {
+    font-size: 0.82rem;
+  }
+
+  .results-panel .recommendation-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
   }
 
   .input-grid {

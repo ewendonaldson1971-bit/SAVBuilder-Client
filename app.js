@@ -97,9 +97,18 @@
     "Laminate Data Sheet",
     "Laminate Datasheet"
   ];
+  const PUBLISHED_COLUMN_CANDIDATES = [
+    "Published",
+    "Publish",
+    "Is Published",
+    "Published?"
+  ];
   const DERIVED_PERFORATION_COLUMN = "Perforation";
   const CART_WINDOW_NAME = "savBuilderCart";
   const CART_NAVIGATION_DELAY_MS = 1200;
+  const IMPOSITION_EMAIL_TO = "sales@vivad.com.au";
+  const IMPOSITION_EMAIL_SUBJECT = "SavBuilder imposition submitted";
+  const IMPOSITION_EMAIL_ACTION = "email-imposition";
 
   const FALLBACK_SELECTOR_CSV = [
     '"Surface","Mounting Surface","Type","Laminate","Longevity","Product","Width1","Cost1","Width2","Cost2","Print SQM Rate"',
@@ -220,6 +229,7 @@
     ui.refreshProducts = document.getElementById("refresh-products");
     ui.printRateConstant = document.getElementById("print-rate-constant");
     ui.downloadImposition = document.getElementById("download-imposition");
+    ui.emailImposition = document.getElementById("email-imposition");
     ui.bleedMm = document.getElementById("bleed-mm");
     ui.overlapMm = document.getElementById("overlap-mm");
     ui.elementModeInputs = Array.from(document.querySelectorAll("input[name='element-entry-mode']"));
@@ -232,6 +242,7 @@
     ui.artworkUpload = document.getElementById("artwork-upload");
     ui.clearArtwork = document.getElementById("clear-artwork");
     ui.artworkList = document.getElementById("artwork-list");
+    ui.artworkFitWarning = document.getElementById("artwork-fit-warning");
     ui.inputErrors = document.getElementById("input-errors");
     ui.rollChoice = document.getElementById("roll-choice");
     ui.metricLinear = document.getElementById("metric-linear");
@@ -254,14 +265,14 @@
   function applyAppMode() {
     document.title = APP_CONFIG.title;
     document.documentElement.style.setProperty("--paper", APP_CONFIG.background);
+    document.body.dataset.appMode = APP_MODE;
     if (ui.appTitle) ui.appTitle.textContent = APP_CONFIG.title;
+    if (ui.openGSheet) ui.openGSheet.hidden = APP_MODE === "live";
+    if (ui.refreshProducts) ui.refreshProducts.hidden = APP_MODE === "live";
   }
 
   function attachEvents() {
-    ui.productSearch.addEventListener("input", () => {
-      state.productSearchQuery = ui.productSearch.value;
-      renderProductSearch();
-    });
+    ui.productSearch.addEventListener("input", handleProductSearchInput);
 
     ui.productSearchResults.addEventListener("click", (event) => {
       const result = event.target.closest("[data-product-search-index]");
@@ -355,13 +366,24 @@
       }
 
       if (!choice) return;
-      state.productSearchSelection = null;
       const column = choice.dataset.selectorColumn;
+      if (column === "Product" && reopenLaminateSelectionForProduct(choice.dataset.selectorValue)) {
+        state.productSearchSelection = null;
+        recalculate();
+        return;
+      }
+      const shouldKeepSearchSelection = Boolean(state.productSearchSelection) && column !== "Product";
+      if (!shouldKeepSearchSelection) {
+        state.productSearchSelection = null;
+      }
       state.selectorSelections[column] = choice.dataset.selectorValue;
       if (choice.dataset.selectorPreserveAfter === "true") {
         validateSelectorSelections();
       } else {
         pruneSelectionsAfter(column);
+      }
+      if (shouldKeepSearchSelection && state.productSearchSelection) {
+        state.productSearchSelection.selections = { ...state.selectorSelections };
       }
       recalculate();
     });
@@ -458,6 +480,7 @@
     });
 
     ui.downloadImposition.addEventListener("click", downloadImposition);
+    ui.emailImposition.addEventListener("click", emailImposition);
     ui.addAllCartButtons.forEach((button) => {
       button.addEventListener("click", addAllToCart);
     });
@@ -940,7 +963,9 @@
   }
 
   async function refreshProducts() {
-    ui.sheetStatus.textContent = "Selector: loading";
+    if (ui.sheetStatus) {
+      ui.sheetStatus.textContent = "Selector: loading";
+    }
     await refreshPricingConfig();
     try {
       const selectorData = await loadSelectorFromAppsScript();
@@ -1037,7 +1062,7 @@
   }
 
   function applySelectorData(selectorData, source) {
-    state.selectorRows = selectorData.rows;
+    state.selectorRows = getPublishedSelectorRows(selectorData.rows);
     state.selectorColumns = selectorData.selectorColumns;
     state.postProductSelectorColumns = selectorData.postProductSelectorColumns || [];
     state.productSource = source;
@@ -1048,7 +1073,26 @@
     renderClassSelector();
     renderLimitFilters();
     renderMountingSurfaceSelector();
-    ui.sheetStatus.textContent = source === "apps-script" ? "Selector: Apps Script" : "Selector: fallback";
+    if (ui.sheetStatus) {
+      ui.sheetStatus.textContent = source === "apps-script" ? "Selector: Apps Script" : "Selector: fallback";
+    }
+  }
+
+  function getPublishedSelectorRows(rows) {
+    if (APP_MODE !== "live" || !hasPublishedColumn(rows)) return rows;
+    return rows.filter(isPublishedSelectorRow);
+  }
+
+  function hasPublishedColumn(rows) {
+    return rows.some((row) =>
+      Object.keys(row).some(isPublishedColumnName)
+    );
+  }
+
+  function isPublishedSelectorRow(row) {
+    return PUBLISHED_COLUMN_CANDIDATES.some((column) =>
+      isTrueFilterCell(getRowValueForColumn(row, column))
+    );
   }
 
   function recalculate() {
@@ -1138,12 +1182,14 @@
     const productName = selection.productName || selections.Product || rows[0].Product;
     const question = getPrintModeQuestion(rows, selections);
     if (question) {
+      const previewProduct = buildProductFromRows(rows, productName, selections);
       return {
         selections,
         pathEntries: getSelectorPathEntries(selections, rows, question),
         candidates: rows,
         question,
         product: null,
+        previewProduct,
         hasRows: state.selectorRows.length > 0,
         completeProductCount: rows.length
       };
@@ -1188,6 +1234,19 @@
     `;
   }
 
+  function handleProductSearchInput() {
+    state.productSearchQuery = ui.productSearch.value;
+    if (applyMountingSurfaceFilterFromSearch(state.productSearchQuery)) {
+      state.productSearchSelection = null;
+      validateSelectorSelections();
+      renderMountingSurfaceSelector();
+      recalculate();
+      return;
+    }
+
+    renderProductSearch();
+  }
+
   function getProductSearchResults(query) {
     const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
     const grouped = new Map();
@@ -1228,8 +1287,11 @@
   }
 
   function getProductSearchHaystack(row) {
+    const mountingSurface = row[MOUNTING_SURFACE_COLUMN];
     const values = [
       row.Product,
+      mountingSurface,
+      getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, mountingSurface),
       row.Laminate,
       ...getRollQCodes(row)
     ].filter(Boolean);
@@ -1244,6 +1306,51 @@
     const normalizedTerm = normalizeKey(term);
     return haystack.text.includes(term) ||
       (normalizedTerm && haystack.normalized.includes(normalizedTerm));
+  }
+
+  function applyMountingSurfaceFilterFromSearch(query) {
+    const matchingSurface = getMountingSurfaceSearchMatch(query);
+    if (!matchingSurface || matchingSurface === state.mountingSurfaceFilter) return false;
+    state.mountingSurfaceFilter = matchingSurface;
+    return true;
+  }
+
+  function getMountingSurfaceSearchMatch(query) {
+    const normalizedQuery = normalizeKey(query);
+    const terms = getProductSearchTerms(query);
+    if (!normalizedQuery && !terms.length) return "";
+
+    return getAvailableMountingSurfaceChoices().find((choice) =>
+      getMountingSurfaceSearchLabels(choice).some((label) =>
+        matchesMountingSurfaceSearchLabel(label, normalizedQuery, terms)
+      )
+    ) || "";
+  }
+
+  function getMountingSurfaceSearchLabels(choice) {
+    return Array.from(new Set([
+      choice,
+      getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, choice)
+    ].map((label) => String(label || "").trim()).filter(Boolean)));
+  }
+
+  function getProductSearchTerms(query) {
+    return String(query || "")
+      .toLowerCase()
+      .split(/[^a-z0-9]+/i)
+      .map(normalizeKey)
+      .filter(Boolean);
+  }
+
+  function matchesMountingSurfaceSearchLabel(label, normalizedQuery, terms) {
+    const labelKey = normalizeKey(label);
+    if (!labelKey) return false;
+    if (normalizedQuery && (labelKey === normalizedQuery || (normalizedQuery.length >= 3 && labelKey.includes(normalizedQuery)))) {
+      return true;
+    }
+    return terms.some((term) =>
+      term.length >= 3 && (labelKey === term || labelKey.includes(term))
+    );
   }
 
   function renderProductSearchResult(result, index) {
@@ -1347,6 +1454,50 @@
     return getSelectorSelectionOrder()
       .filter((column) => column !== MOUNTING_SURFACE_COLUMN && shouldShowSelectorColumn(column) && selections[column])
       .map((column) => ({ column, value: selections[column], inferred: false }));
+  }
+
+  function reopenLaminateSelectionForProduct(productName) {
+    const product = String(productName || "").trim();
+    if (!product || normalizeKey(state.selectorSelections.Product) !== normalizeKey(product)) return false;
+    if (!state.selectorSelections[LAMINATE_COLUMN]) return false;
+    if (getLaminateChoicesForProduct(product).length <= 1) return false;
+
+    clearSelectionFromColumn(LAMINATE_COLUMN, { Product: product });
+    return true;
+  }
+
+  function getLaminateChoicesForProduct(productName) {
+    const product = String(productName || "").trim();
+    if (!product) return [];
+    const selections = {
+      ...getSelectionsBeforeColumn(state.selectorSelections, "Product"),
+      Product: product
+    };
+    return getSortedSelectorChoices(
+      getCandidateSelectorRows(selections).filter((row) => row.isCompleteProduct),
+      LAMINATE_COLUMN
+    ).filter(isMeaningfulSelectorValue);
+  }
+
+  function clearSelectionFromColumn(column, preservedSelections = {}) {
+    const order = getSelectorSelectionOrder();
+    const index = order.indexOf(column);
+    if (index >= 0) {
+      order.slice(index).forEach((laterColumn) => {
+        delete state.selectorSelections[laterColumn];
+      });
+    } else {
+      delete state.selectorSelections[column];
+      delete state.selectorSelections[PRINT_MODE_COLUMN];
+      state.postProductSelectorColumns.forEach((laterColumn) => {
+        delete state.selectorSelections[laterColumn];
+      });
+    }
+
+    Object.entries(preservedSelections).forEach(([preservedColumn, value]) => {
+      if (value) state.selectorSelections[preservedColumn] = value;
+    });
+    validateSelectorSelections();
   }
 
   function isSyntheticSelectorColumn(column) {
@@ -2831,6 +2982,11 @@
       .some((column) => key === normalizeKey(column));
   }
 
+  function isPublishedColumnName(header) {
+    const key = normalizeKey(header);
+    return PUBLISHED_COLUMN_CANDIDATES.some((column) => key === normalizeKey(column));
+  }
+
   function isSurfaceDescriptionColumnName(header) {
     const key = normalizeKey(header);
     return key === "d" || key === "description" || key === "desc" || key === "surfacedescription";
@@ -2851,7 +3007,7 @@
 
   function isIgnoredSelectorDataColumn(header) {
     const key = normalizeKey(header);
-    return key === "updated" || key === "notes" || key === "note";
+    return key === "updated" || key === "notes" || key === "note" || isPublishedColumnName(header);
   }
 
   function buildSelectorColumns(baseSelectorColumns, selectorRows, perforationColumn) {
@@ -3122,10 +3278,10 @@
     const widestRoll = options.reduce((max, option) => Math.max(max, option.roll.printableWidth || option.roll.width), 0);
     const fitWarning = getStockFitWarning(best.maxUnrotatedPrintWidth, widestRoll);
     ui.costBreakdown.innerHTML = `
-      ${fitWarning ? `<div class="fit-warning">${escapeHtml(fitWarning)}</div>` : ""}
       <div><span>Imposed length</span><strong>${formatNumber(best.costs.printLinearM, 2)} m</strong></div>
     `;
-    ui.downloadImposition.disabled = false;
+    renderArtworkFitWarning(fitWarning);
+    setImpositionActionButtonsDisabled(false);
 
     renderOffsetPrompt(best);
     renderOptions(options, best);
@@ -3138,7 +3294,14 @@
       return "";
     }
 
-    return `Widest entered print width is ${formatInteger(requiredWidth)} mm, but this product only lists printable stock up to ${formatInteger(widestRoll)} mm. The job is being panelled; choose a product with wider stock or add that width to the Selector sheet to avoid joins.`;
+    return `Widest entered print width is ${formatInteger(requiredWidth)} mm, but this product only lists printable stock up to ${formatInteger(widestRoll)} mm. The job will be panelled.`;
+  }
+
+  function renderArtworkFitWarning(message) {
+    if (!ui.artworkFitWarning) return;
+    const text = String(message || "").trim();
+    ui.artworkFitWarning.hidden = !text;
+    ui.artworkFitWarning.textContent = text;
   }
 
   function getRollChoiceLabel(roll) {
@@ -3159,6 +3322,7 @@
       ui.printRateConstant.textContent = state.selectedProduct ? `${formatMoney(getEffectivePrintSqmRate(state.selectedProduct))} / sqm` : "Select product";
     }
     ui.costBreakdown.innerHTML = "";
+    renderArtworkFitWarning("");
     ui.offsetPrompt.classList.add("hidden");
     ui.optionsBody.innerHTML = "";
     ui.pricingBody.innerHTML = "";
@@ -3168,7 +3332,7 @@
     ui.priceSummary.textContent = "";
     ui.impositionSummary.textContent = "";
     ui.impositionPreview.innerHTML = `<div class="empty-state">Enter job elements to calculate the roll.</div>`;
-    ui.downloadImposition.disabled = true;
+    setImpositionActionButtonsDisabled(true);
   }
 
   function renderProductRequired(selectorState) {
@@ -3181,6 +3345,7 @@
       ui.printRateConstant.textContent = "Select product";
     }
     ui.costBreakdown.innerHTML = "";
+    renderArtworkFitWarning("");
     ui.offsetPrompt.classList.add("hidden");
     ui.optionsBody.innerHTML = "";
     ui.pricingBody.innerHTML = "";
@@ -3190,7 +3355,7 @@
     ui.priceSummary.textContent = "";
     ui.impositionSummary.textContent = "";
     ui.impositionPreview.innerHTML = `<div class="empty-state">${escapeHtml(getSelectorEmptyMessage(selectorState))}</div>`;
-    ui.downloadImposition.disabled = true;
+    setImpositionActionButtonsDisabled(true);
   }
 
   function renderInputErrors(errors) {
@@ -3212,7 +3377,7 @@
       ? renderSelectorQuestion(selectorState.question)
       : "";
 
-    const product = selectorState.product;
+    const product = selectorState.product || selectorState.previewProduct;
     const productBrowseMarkup = renderProductBrowseChoices(selectorState, nestedProductQuestion);
     const productMarkup = product ? `
       <div class="selected-product">
@@ -3259,6 +3424,7 @@
   function getNestedProductQuestion(selectorState) {
     const question = selectorState.question;
     const selections = selectorState.selections || {};
+    if (state.productSearchSelection) return null;
     if (!question || !selections.Product || question.column === "Product") return null;
 
     const order = getSelectorSelectionOrder();
@@ -3360,9 +3526,8 @@
     return `
       <div class="product-spec-links">
         ${links.map((link) => `
-          <a class="product-spec-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener">
+          <a class="product-spec-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener" aria-label="${escapeHtml(link.label)}" title="${escapeHtml(link.label)}">
             ${renderPdfIcon()}
-            <span>${escapeHtml(link.label)}</span>
           </a>
         `).join("")}
       </div>
@@ -3446,16 +3611,9 @@
   }
 
   function renderImagePreviewContent(url) {
-    const parsed = safeParseUrl(url);
-    const title = getReadableUrlTitle(parsed);
-    const host = getReadableHost(parsed);
     return `
       <span class="image-preview-media">
-        <img src="${escapeHtml(url)}" alt="${escapeHtml(title)}" loading="lazy">
-      </span>
-      <span class="image-preview-caption">
-        <span class="og-preview-site">${escapeHtml(host || "Image")}</span>
-        <span class="og-preview-title">${escapeHtml(title || "Linked image")}</span>
+        <img src="${escapeHtml(url)}" alt="" loading="lazy">
       </span>
     `;
   }
@@ -3888,6 +4046,12 @@
     });
   }
 
+  function setImpositionActionButtonsDisabled(disabled) {
+    [ui.downloadImposition, ui.emailImposition].filter(Boolean).forEach((button) => {
+      button.disabled = disabled;
+    });
+  }
+
   function navigateCartTab(url, cartWindow) {
     try {
       if (cartWindow && !cartWindow.closed) {
@@ -4096,17 +4260,91 @@
 
   function downloadImposition() {
     if (!state.currentBest) return;
-    const svg = buildImpositionSvg(state.currentBest, { preview: false });
+    const svg = getCurrentImpositionSvg();
     const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
-    const safeProduct = state.currentBest.productName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
     anchor.href = url;
-    anchor.download = `imposition-${safeProduct}-${Math.round(state.currentBest.roll.width)}mm.svg`;
+    anchor.download = getImpositionFilename();
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function emailImposition() {
+    if (!state.currentBest) return;
+    if (!isAppsScriptConfigured()) {
+      window.alert("Apps Script is not configured yet.");
+      return;
+    }
+
+    const button = ui.emailImposition;
+    const originalTitle = button?.getAttribute("title") || "Email imposition";
+    const originalAriaLabel = button?.getAttribute("aria-label") || "Email imposition";
+
+    try {
+      setImpositionActionButtonsDisabled(true);
+      if (button) {
+        button.setAttribute("aria-busy", "true");
+        button.setAttribute("title", "Submitting imposition...");
+        button.setAttribute("aria-label", "Submitting imposition");
+      }
+
+      await submitImpositionEmail({
+        svg: getCurrentImpositionSvg(),
+        filename: getImpositionFilename(),
+        productName: state.currentBest.productName,
+        rollWidth: Math.round(state.currentBest.roll.width),
+        total: formatMoney(state.currentBest.costs.total)
+      });
+
+      window.alert(`Email request sent to Apps Script for ${IMPOSITION_EMAIL_TO}.`);
+    } catch (error) {
+      window.alert(error?.message || "Could not email the imposition. Please download it and send it manually.");
+    } finally {
+      if (button) {
+        button.removeAttribute("aria-busy");
+        button.setAttribute("title", originalTitle);
+        button.setAttribute("aria-label", originalAriaLabel);
+      }
+      setImpositionActionButtonsDisabled(!state.currentBest);
+    }
+  }
+
+  async function submitImpositionEmail(payload) {
+    const formData = new FormData();
+    formData.set("action", IMPOSITION_EMAIL_ACTION);
+    formData.set("mode", APP_MODE);
+    formData.set("subject", IMPOSITION_EMAIL_SUBJECT);
+    formData.set("filename", payload.filename);
+    formData.set("svg", payload.svg);
+    formData.set("productName", payload.productName || "");
+    formData.set("rollWidth", String(payload.rollWidth || ""));
+    formData.set("total", payload.total || "");
+
+    await fetch(APPS_SCRIPT_WEB_APP_URL, {
+      method: "POST",
+      mode: "no-cors",
+      body: formData
+    });
+  }
+
+  function getCurrentImpositionSvg() {
+    return state.currentBest ? buildImpositionSvg(state.currentBest, { preview: false }) : "";
+  }
+
+  function getImpositionFilename(best = state.currentBest) {
+    if (!best) return "sav-builder-imposition.svg";
+    const safeProduct = getSafeFileSegment(best.productName) || "product";
+    return `imposition-${safeProduct}-${Math.round(best.roll.width)}mm.svg`;
+  }
+
+  function getSafeFileSegment(value) {
+    return String(value || "")
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 90);
   }
 
   function formatMoney(value) {
