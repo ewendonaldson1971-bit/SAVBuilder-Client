@@ -222,6 +222,7 @@
     ui.selectorSurvey = document.getElementById("selector-survey");
     ui.appTitle = document.getElementById("app-title");
     ui.configuratorProgress = document.getElementById("configurator-progress");
+    ui.configuratorGuidance = document.getElementById("configurator-guidance");
     ui.advancedConfigStatus = document.getElementById("advanced-config-status");
     ui.brandSelector = document.getElementById("brand-selector");
     ui.classSelector = document.getElementById("class-selector");
@@ -1115,6 +1116,7 @@
     if (!parsed.elements.length) {
       state.currentBest = null;
       state.currentOptions = [];
+      renderConfiguratorGuidance(selectorState, parsed.elements, null);
       renderArtworkList(parsed.elements);
       renderEmptyResults();
       return;
@@ -1124,6 +1126,7 @@
     if (!product) {
       state.currentBest = null;
       state.currentOptions = [];
+      renderConfiguratorGuidance(selectorState, parsed.elements, null);
       renderArtworkList(parsed.elements);
       renderProductRequired(selectorState);
       return;
@@ -1139,6 +1142,7 @@
 
     renderArtworkList(parsed.elements);
     renderResults(best, ranked, parsed.elements);
+    renderConfiguratorGuidance(selectorState, parsed.elements, best);
   }
 
   function getSettings() {
@@ -1520,21 +1524,21 @@
 
     const steps = [
       {
+        label: "Product",
+        value: product?.name || currentQuestion,
+        status: hasProduct ? "complete" : "current"
+      },
+      {
         label: "Surface",
         value: state.mountingSurfaceFilter === MOUNTING_SURFACE_ALL
           ? "All"
           : getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, state.mountingSurfaceFilter),
-        status: "complete"
+        status: state.mountingSurfaceFilter === MOUNTING_SURFACE_ALL ? "neutral" : "complete"
       },
       {
         label: "Filters",
         value: activeFilterCount ? `${activeFilterCount} active` : "Default",
         status: activeFilterCount ? "complete" : "neutral"
-      },
-      {
-        label: "Product",
-        value: product?.name || currentQuestion,
-        status: hasProduct ? "complete" : "current"
       },
       {
         label: "Data",
@@ -1554,6 +1558,45 @@
         <strong>${escapeHtml(step.value)}</strong>
       </span>
     `).join("");
+  }
+
+  function renderConfiguratorGuidance(selectorState, elements = [], best = null) {
+    if (!ui.configuratorGuidance) return;
+    const hasProduct = Boolean(selectorState.product);
+    const hasElements = elements.length > 0;
+    const product = selectorState.product || selectorState.previewProduct;
+    let title = "Choose a product";
+    let body = "Use product search, mounting surface, brand, class and properties to narrow the available SAVs.";
+    let status = "current";
+
+    if (!selectorState.hasRows) {
+      title = "Loading product data";
+      body = "The selector is waiting for the Apps Script product feed.";
+      status = "pending";
+    } else if (!hasProduct && selectorState.question) {
+      const question = getDisplaySelectorColumn(selectorState.question.label);
+      const count = selectorState.completeProductCount || selectorState.candidates.length;
+      title = `Choose ${question}`;
+      body = `${formatInteger(count)} matching ${count === 1 ? "product" : "products"} remain. Search can still jump straight to a product, QCode or mounting surface.`;
+    } else if (!hasProduct) {
+      title = "Choose a product";
+      body = "Adjust the filters or use search to find the SAV before calculating the job.";
+    } else if (!hasElements) {
+      title = "Enter job sizes";
+      body = `${product?.name || "The product"} is selected. Add quantity, width, height and shortname in Data Entry to calculate the roll.`;
+      status = "current";
+    } else if (best) {
+      title = "Review the recommendation";
+      body = `${best.productName} is selected on ${getRollChoiceLabel(best.roll)} at ${formatMoney(best.costs.rate)} / sqm. Stock Options shows the available alternatives.`;
+      status = "complete";
+    }
+
+    ui.configuratorGuidance.className = `configurator-guidance ${status}`;
+    ui.configuratorGuidance.innerHTML = `
+      <span class="configurator-guidance-kicker">Next action</span>
+      <strong>${escapeHtml(title)}</strong>
+      <span>${escapeHtml(body)}</span>
+    `;
   }
 
   function getActiveFilterCount() {
@@ -3870,6 +3913,7 @@
 
   function getSelectorEmptyMessage(selectorState) {
     if (!selectorState.hasRows) return "No selector data loaded.";
+    if (!selectorState.candidates.length) return "No results found for this selection";
     if (selectorState.question) return "Answer the product survey to select stock.";
     return "No complete product data is available for this selection yet.";
   }
