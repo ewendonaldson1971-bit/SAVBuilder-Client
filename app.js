@@ -113,6 +113,9 @@
   const ADD_TO_CART_EMAIL_TO = "jtlog@vivad.com.au";
   const ADD_TO_CART_EMAIL_SUBJECT = "SAVBuilder Add to cart";
   const ADD_TO_CART_EMAIL_ACTION = "add-to-cart";
+  const APPS_SCRIPT_REQUEST_TIMEOUT_MS = 15000;
+  const APPS_SCRIPT_RETRY_COUNT = 1;
+  const APPS_SCRIPT_RETRY_DELAY_MS = 700;
 
   const FALLBACK_SELECTOR_CSV = [
     '"Surface","Mounting Surface","Type","Laminate","Longevity","Product","Width1","Cost1","Width2","Cost2","Print SQM Rate"',
@@ -303,6 +306,11 @@
 
     ui.configuratorProgress.addEventListener("click", handleConfiguratorProgressClick);
     ui.configuratorGuidance.addEventListener("click", handleConfiguratorGuidanceClick);
+    ui.sheetStatus?.addEventListener("click", (event) => {
+      const retry = event.target.closest("[data-selector-retry]");
+      if (!retry) return;
+      refreshProducts();
+    });
 
     ui.productSearchResults.addEventListener("click", (event) => {
       const result = event.target.closest("[data-product-search-index]");
@@ -1186,16 +1194,30 @@
   }
 
   async function refreshProducts() {
-    if (ui.sheetStatus) {
-      ui.sheetStatus.textContent = "Selector: loading";
-    }
-    await refreshPricingConfig();
-    try {
-      const selectorData = await loadSelectorFromAppsScript();
-      if (!selectorData.rows.length) throw new Error("No selector rows in sheet");
-      applySelectorData(selectorData, "apps-script");
-    } catch (error) {
+    setSheetStatus("loading", "Loading selector data...");
+
+    const [configResult, selectorResult] = await Promise.allSettled([
+      loadConfigFromAppsScript(),
+      loadSelectorFromAppsScript()
+    ]);
+
+    state.pricingConfig = configResult.status === "fulfilled"
+      ? { ...DEFAULT_PRICING_CONFIG, ...configResult.value }
+      : { ...DEFAULT_PRICING_CONFIG };
+
+    if (selectorResult.status === "fulfilled" && selectorResult.value.rows.length) {
+      applySelectorData(selectorResult.value, "apps-script");
+      if (configResult.status === "rejected") {
+        setSheetStatus("warning", "Product data loaded, but Config could not be loaded. Default pricing settings are being used.", { retry: true });
+      } else {
+        setSheetStatus("", "");
+      }
+    } else {
+      const error = selectorResult.status === "rejected"
+        ? selectorResult.reason
+        : new Error("No selector rows in sheet");
       applySelectorData(parseSelectorCsv(FALLBACK_SELECTOR_CSV), "fallback");
+      setSheetStatus("error", getSelectorLoadFailureMessage(error), { retry: true });
     }
 
     recalculate();
@@ -1237,18 +1259,67 @@
     );
   }
 
-  function loadAppsScriptPayload(params = {}) {
+  async function loadAppsScriptPayload(params = {}) {
     if (!isAppsScriptConfigured()) {
       return Promise.reject(new Error("Apps Script is not configured."));
     }
 
+    let lastError = null;
+    for (let attempt = 0; attempt <= APPS_SCRIPT_RETRY_COUNT; attempt += 1) {
+      try {
+        return await loadAppsScriptJsonPayload(params);
+      } catch (error) {
+        lastError = error;
+      }
+
+      try {
+        return await loadAppsScriptJsonpPayload(params);
+      } catch (error) {
+        lastError = error;
+      }
+
+      if (attempt < APPS_SCRIPT_RETRY_COUNT) {
+        await wait(APPS_SCRIPT_RETRY_DELAY_MS * (attempt + 1));
+      }
+    }
+
+    throw lastError || new Error("Apps Script request failed.");
+  }
+
+  async function loadAppsScriptJsonPayload(params = {}) {
+    const url = buildAppsScriptUrl(params);
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const timeout = window.setTimeout(() => controller?.abort(), APPS_SCRIPT_REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        mode: "cors",
+        cache: "no-store",
+        signal: controller?.signal
+      });
+      const text = await response.text();
+      const payload = parseAppsScriptJsonResponse(text);
+      validateAppsScriptPayload(payload, response.status);
+      return payload;
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        throw new Error("Apps Script request timed out.");
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  function loadAppsScriptJsonpPayload(params = {}) {
     return new Promise((resolve, reject) => {
       const callbackName = `__savBuilderAppsScript${Date.now()}${Math.floor(Math.random() * 10000)}`;
       const script = document.createElement("script");
       const timeout = window.setTimeout(() => {
         cleanup();
         reject(new Error("Apps Script request timed out."));
-      }, 10000);
+      }, APPS_SCRIPT_REQUEST_TIMEOUT_MS);
 
       function cleanup() {
         window.clearTimeout(timeout);
@@ -1258,11 +1329,12 @@
 
       window[callbackName] = (payload) => {
         cleanup();
-        if (!payload || payload.ok === false) {
-          reject(new Error(payload?.error || "Apps Script request failed."));
-          return;
+        try {
+          validateAppsScriptPayload(payload);
+          resolve(payload);
+        } catch (error) {
+          reject(error);
         }
-        resolve(payload);
       };
 
       script.onerror = () => {
@@ -1270,18 +1342,44 @@
         reject(new Error("Apps Script request failed."));
       };
 
-      const url = new URL(APPS_SCRIPT_WEB_APP_URL);
-      Object.entries({
-        ...params,
-        mode: APP_MODE,
-        callback: callbackName,
-        _: Date.now()
-      }).forEach(([key, value]) => {
-        if (value != null && value !== "") url.searchParams.set(key, value);
-      });
-      script.src = url.toString();
+      script.src = buildAppsScriptUrl(params, callbackName).toString();
       document.head.appendChild(script);
     });
+  }
+
+  function buildAppsScriptUrl(params = {}, callbackName = "") {
+    const url = new URL(APPS_SCRIPT_WEB_APP_URL);
+    Object.entries({
+      ...params,
+      mode: APP_MODE,
+      callback: callbackName,
+      _: Date.now()
+    }).forEach(([key, value]) => {
+      if (value != null && value !== "") url.searchParams.set(key, value);
+    });
+    return url;
+  }
+
+  function validateAppsScriptPayload(payload, status = 200) {
+    if (!payload || payload.ok === false) {
+      throw new Error(payload?.error || `Apps Script request failed with HTTP ${status}.`);
+    }
+  }
+
+  function getSelectorLoadFailureMessage(error) {
+    const detail = APP_MODE === "dev" && error?.message ? ` ${error.message}` : "";
+    return `Could not load the live GSheet data.${detail} Using emergency fallback data.`;
+  }
+
+  function setSheetStatus(variant, message, options = {}) {
+    if (!ui.sheetStatus) return;
+
+    const text = String(message || "").trim();
+    ui.sheetStatus.hidden = !text;
+    ui.sheetStatus.className = `sheet-status${variant ? ` ${variant}` : ""}`;
+    ui.sheetStatus.innerHTML = text
+      ? `<span>${escapeHtml(text)}</span>${options.retry ? `<button class="ghost-button compact" type="button" data-selector-retry>Try again</button>` : ""}`
+      : "";
   }
 
   function applySelectorData(selectorData, source) {
@@ -1296,9 +1394,6 @@
     renderClassSelector();
     renderLimitFilters();
     renderMountingSurfaceSelector();
-    if (ui.sheetStatus) {
-      ui.sheetStatus.textContent = source === "apps-script" ? "Selector: Apps Script" : "Selector: fallback";
-    }
   }
 
   function getPublishedSelectorRows(rows) {

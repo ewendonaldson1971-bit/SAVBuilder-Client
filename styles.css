@@ -279,6 +279,55 @@ h2 {
   color: var(--green-dark);
 }
 
+.sheet-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 0 14px;
+  padding: 9px 10px;
+  border: 1px solid #b8cbe0;
+  border-left: 4px solid #348ede;
+  border-radius: 8px;
+  background: #f7fbff;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.sheet-status.warning {
+  border-color: #eed58d;
+  border-left-color: #b47a00;
+  background: #fff9e8;
+  color: #604200;
+}
+
+.sheet-status.error {
+  border-color: #fac0ca;
+  border-left-color: var(--green);
+  background: #fff4f6;
+  color: #8d1028;
+}
+
+.sheet-status .ghost-button {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border-color: #348ede;
+  background: #348ede;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.sheet-status .ghost-button:hover:not(:disabled) {
+  border-color: #2378c4;
+  background: #2378c4;
+  color: #fff;
+}
+
 .field {
   display: grid;
   gap: 7px;
