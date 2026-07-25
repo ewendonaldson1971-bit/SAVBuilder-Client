@@ -3,8 +3,8 @@
 
   const APP_MODES = {
     live: {
-      title: "SAV Builder-Live",
-      background: "#ffffff"
+      title: "SAV Builder",
+      background: "#eff5fb"
     },
     dev: {
       title: "SAV Builder DEV",
@@ -200,6 +200,7 @@
   let recommendationPanelResizeObserver = null;
   let pdfjsPromise = null;
   let artworkCropInteraction = null;
+  let appToastTimer = 0;
 
   document.addEventListener("DOMContentLoaded", init);
 
@@ -242,6 +243,7 @@
     ui.productSearch = document.getElementById("product-search");
     ui.productSearchResults = document.getElementById("product-search-results");
     ui.sheetStatus = document.getElementById("sheet-status");
+    ui.appToast = document.getElementById("app-toast");
     ui.openGSheet = document.getElementById("open-gsheet");
     ui.refreshProducts = document.getElementById("refresh-products");
     ui.printRateConstant = document.getElementById("print-rate-constant");
@@ -879,7 +881,7 @@
 
   async function openGSheetWithPassword() {
     if (!isAppsScriptConfigured()) {
-      window.alert("Apps Script is not configured yet.");
+      showAppToast("Apps Script is not configured yet.", "error");
       return;
     }
 
@@ -894,7 +896,7 @@
       if (!payload.url) throw new Error("No sheet URL was returned.");
       window.open(payload.url, "_blank", "noopener");
     } catch (error) {
-      window.alert(error.message || "Could not open the GSheet.");
+      showAppToast(error.message || "Could not open the GSheet.", "error");
     }
   }
 
@@ -1380,6 +1382,32 @@
     ui.sheetStatus.innerHTML = text
       ? `<span>${escapeHtml(text)}</span>${options.retry ? `<button class="ghost-button compact" type="button" data-selector-retry>Try again</button>` : ""}`
       : "";
+  }
+
+  function showAppToast(message, variant = "success", options = {}) {
+    const text = String(message || "").trim();
+    if (!text) return;
+
+    window.clearTimeout(appToastTimer);
+
+    if (!ui.appToast) {
+      if (variant === "error") window.alert(text);
+      return;
+    }
+
+    const timeoutMs = Number.isFinite(options.timeoutMs)
+      ? options.timeoutMs
+      : (variant === "error" ? 6500 : 3400);
+
+    ui.appToast.textContent = text;
+    ui.appToast.className = `app-toast ${variant}`;
+    ui.appToast.hidden = false;
+    window.requestAnimationFrame(() => ui.appToast.classList.add("is-visible"));
+
+    appToastTimer = window.setTimeout(() => {
+      ui.appToast.classList.remove("is-visible");
+      window.setTimeout(() => { ui.appToast.hidden = true; }, 180);
+    }, timeoutMs);
   }
 
   function applySelectorData(selectorData, source) {
@@ -4533,10 +4561,20 @@
         button.textContent = originalLabels.get(button) || "Add all to cart";
       });
       setAddAllCartButtonsDisabled(!state.currentCartUrls.length);
+      showAppToast(getAddToCartToastMessage(urls.length), "success");
       if (addToCartEmailError) {
-        window.alert(addToCartEmailError?.message || "Could not email the add-to-cart details.");
+        window.setTimeout(() => {
+          showAppToast(addToCartEmailError?.message || "Cart opened, but the add-to-cart email could not be sent.", "warning", { timeoutMs: 5600 });
+        }, 900);
       }
     }
+  }
+
+  function getAddToCartToastMessage(lineCount) {
+    const count = Math.max(1, Number(lineCount) || 1);
+    const itemText = count === 1 ? "1 item" : `${count} items`;
+    const addedText = count === 1 ? "Added a new item" : "Added new items";
+    return `Shopping cart (${itemText}) - ${addedText}`;
   }
 
   function setAddAllCartButtonsDisabled(disabled) {
@@ -4653,7 +4691,7 @@
           <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="3" fill="none" stroke="#17201c" stroke-opacity="0.35" stroke-width="1"/>
           ${overlapLine}
           ${labelPlate}
-          ${canLabel ? `<text x="${x + 6}" y="${y + 16}" fill="#ffffff" font-size="12" font-family="Open Sans, Cabin">${escapeSvg(label)}</text>` : ""}
+          ${canLabel ? `<text x="${x + 6}" y="${y + 16}" fill="#ffffff" font-size="12" font-family="Open Sans, Segoe UI, Arial, sans-serif">${escapeSvg(label)}</text>` : ""}
         </g>
       `;
     }).join("");
@@ -4662,19 +4700,19 @@
     const rollHeight = drawingHeight;
     const metreMarks = buildMetreMarks(lengthMm, scale, pad, titleHeight, drawingWidth);
     const truncatedNote = pack.truncated
-      ? `<text x="${pad}" y="${svgHeight - 12}" fill="#5e6a64" font-size="12" font-family="Open Sans, Cabin">Preview capped at ${pack.placements.length} of ${pack.totalPieces} print pieces.</text>`
+      ? `<text x="${pad}" y="${svgHeight - 12}" fill="#5e6a64" font-size="12" font-family="Open Sans, Segoe UI, Arial, sans-serif">Preview capped at ${pack.placements.length} of ${pack.totalPieces} print pieces.</text>`
       : "";
 
     return `
       <svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" role="img" aria-label="Roll imposition">
         <rect width="100%" height="100%" fill="#fbfcfa"/>
-        <text x="${pad}" y="24" fill="#17201c" font-size="${preview ? 16 : 22}" font-weight="700" font-family="Open Sans, Cabin">${escapeSvg(title)}</text>
-        <text x="${pad}" y="${preview ? 42 : 47}" fill="#5e6a64" font-size="12" font-family="Open Sans, Cabin">Strategy: ${escapeSvg(getStrategyLabel(pack.strategy))} | Joins: ${formatInteger(best.joins)} | Total: ${escapeSvg(formatMoney(best.costs.total))}</text>
+        <text x="${pad}" y="24" fill="#17201c" font-size="${preview ? 16 : 22}" font-weight="700" font-family="Open Sans, Segoe UI, Arial, sans-serif">${escapeSvg(title)}</text>
+        <text x="${pad}" y="${preview ? 42 : 47}" fill="#5e6a64" font-size="12" font-family="Open Sans, Segoe UI, Arial, sans-serif">Strategy: ${escapeSvg(getStrategyLabel(pack.strategy))} | Joins: ${formatInteger(best.joins)} | Total: ${escapeSvg(formatMoney(best.costs.total))}</text>
         <defs>${clipDefs.join("")}</defs>
         <rect x="${pad}" y="${rollY}" width="${drawingWidth}" height="${rollHeight}" fill="#ffffff" stroke="#17201c" stroke-width="1.4"/>
         ${metreMarks}
         ${rects}
-        <text x="${pad + drawingWidth + 8}" y="${rollY + 14}" fill="#5e6a64" font-size="11" font-family="Open Sans, Cabin">${formatInteger(stockWidth)} mm</text>
+        <text x="${pad + drawingWidth + 8}" y="${rollY + 14}" fill="#5e6a64" font-size="11" font-family="Open Sans, Segoe UI, Arial, sans-serif">${formatInteger(stockWidth)} mm</text>
         ${truncatedNote}
       </svg>
     `;
@@ -4757,7 +4795,7 @@
       const y = titleHeight + metre * 1000 * scale;
       marks.push(`
         <line x1="${pad}" y1="${y}" x2="${pad + drawingWidth}" y2="${y}" stroke="#d9dfda" stroke-width="1"/>
-        <text x="${pad - 8}" y="${y + 4}" text-anchor="end" fill="#5e6a64" font-size="10" font-family="Open Sans, Cabin">${metre}m</text>
+        <text x="${pad - 8}" y="${y + 4}" text-anchor="end" fill="#5e6a64" font-size="10" font-family="Open Sans, Segoe UI, Arial, sans-serif">${metre}m</text>
       `);
     }
     return marks.join("");
@@ -4780,7 +4818,7 @@
   async function emailImposition() {
     if (!state.currentBest) return;
     if (!isAppsScriptConfigured()) {
-      window.alert("Apps Script is not configured yet.");
+      showAppToast("Apps Script is not configured yet.", "error");
       return;
     }
 
@@ -4805,9 +4843,9 @@
         total: formatMoney(state.currentBest.costs.total)
       });
 
-      window.alert(`Email request sent to Apps Script for ${IMPOSITION_EMAIL_TO}.`);
+      showAppToast(`Email request sent to Apps Script for ${IMPOSITION_EMAIL_TO}.`, "success");
     } catch (error) {
-      window.alert(error?.message || "Could not email the imposition. Please download it and send it manually.");
+      showAppToast(error?.message || "Could not email the imposition. Please download it and send it manually.", "error");
     } finally {
       if (button) {
         button.removeAttribute("aria-busy");

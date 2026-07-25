@@ -3,8 +3,11 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SAV Builder-Live</title>
-    <link rel="stylesheet" href="styles.css?v=apps-script-load-reliability-20260721">
+    <title>SAV Builder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cabin:wght@500;600;700&family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=vivad-style-retrofit-20260725">
   </head>
   <body>
     <header class="app-header">
@@ -12,7 +15,7 @@
         <img class="brand-logo" src="assets/vivad-logo.png" alt="Vivad">
         <div>
           <p class="eyebrow">Print estimating</p>
-          <h1 id="app-title">SAV Builder-Live</h1>
+          <h1 id="app-title">SAV Builder</h1>
         </div>
       </div>
       <div class="header-actions">
@@ -39,6 +42,8 @@
         </div>
       </div>
     </header>
+
+    <div id="app-toast" class="app-toast" role="status" aria-live="polite" hidden></div>
 
     <main class="app-shell">
       <section class="setup-panel surface" aria-labelledby="setup-title">
