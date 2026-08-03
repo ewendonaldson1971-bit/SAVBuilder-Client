@@ -20,6 +20,13 @@
     document.querySelector("meta[name='sav-builder-apps-script-url']")?.content ||
     ""
   ).trim();
+  const STRAPI_BASE_URL = String(
+    window.SAV_BUILDER_STRAPI_URL ||
+    APP_SCRIPT_ELEMENT?.dataset?.strapiUrl ||
+    document.querySelector("meta[name='sav-builder-strapi-url']")?.content ||
+    (APP_MODE === "dev" ? new URLSearchParams(window.location.search).get("strapi") : "") ||
+    ""
+  ).trim().replace(/\/+$/, "");
   const PDF_ICON_SRC = "assets/icons/pdf-file-icon.webp?v=1";
 
   const TILE_OFFSET_MM = 5;
@@ -116,6 +123,25 @@
   const APPS_SCRIPT_REQUEST_TIMEOUT_MS = 15000;
   const APPS_SCRIPT_RETRY_COUNT = 1;
   const APPS_SCRIPT_RETRY_DELAY_MS = 700;
+  const STRAPI_REQUEST_TIMEOUT_MS = 15000;
+  const STRAPI_PAGE_SIZE = 200;
+  const SURFACE_LABELS = Object.freeze({
+    "glass": "Glass",
+    "painted-plaster-prepared": "Painted Plaster Prepared",
+    "acm-metal-smooth-surfaces": "ACM /Metal/Smooth Surfaces",
+    "vehicle-wrapping": "Vehicle Wrapping",
+    "tiles": "Tiles",
+    "timber-floor": "Timber Floor",
+    "smooth-concrete": "Smooth Concrete",
+    "brick-or-stone": "Brick or Stone",
+    "carpet": "Carpet",
+    "asphalt": "Asphalt",
+    "raw-gyprock": "Raw Gyprock",
+    "raw-mdf": "Raw MDF",
+    "rough-timber-hoarding": "Rough Timber Hoarding",
+    "acrylic": "Acrylic",
+    "polyethylene": "Polyethylene (Wheely Bins, plastic Seating)"
+  });
 
   const FALLBACK_SELECTOR_CSV = [
     '"Surface","Mounting Surface","Type","Laminate","Longevity","Product","Width1","Cost1","Width2","Cost2","Print SQM Rate"',
@@ -1196,11 +1222,13 @@
   }
 
   async function refreshProducts() {
-    setSheetStatus("loading", "Loading selector data...");
+    setSheetStatus("loading", "Loading SAV catalogue...");
 
-    const [configResult, selectorResult] = await Promise.allSettled([
+    const strapiConfigured = isStrapiConfigured();
+    const [configResult, selectorResult, strapiResult] = await Promise.allSettled([
       loadConfigFromAppsScript(),
-      loadSelectorFromAppsScript()
+      loadSelectorFromAppsScript(),
+      strapiConfigured ? loadSavCatalogFromStrapi() : Promise.resolve(null)
     ]);
 
     state.pricingConfig = configResult.status === "fulfilled"
@@ -1208,7 +1236,26 @@
       : { ...DEFAULT_PRICING_CONFIG };
 
     if (selectorResult.status === "fulfilled" && selectorResult.value.rows.length) {
-      applySelectorData(selectorResult.value, "apps-script");
+      let selectorData = selectorResult.value;
+
+      if (strapiConfigured) {
+        if (strapiResult.status === "rejected") {
+          applySelectorData({ ...selectorData, rows: [] }, "strapi-error");
+          setSheetStatus("error", "Could not load the published Strapi catalogue. Product selection is unavailable.", { retry: true });
+          recalculate();
+          return;
+        }
+
+        selectorData = await mergeStrapiCatalog(selectorData, strapiResult.value);
+        if (!selectorData.rows.length) {
+          applySelectorData(selectorData, "strapi");
+          setSheetStatus("warning", "Strapi has no published SAV configurations matching the pricing feed.", { retry: true });
+          recalculate();
+          return;
+        }
+      }
+
+      applySelectorData(selectorData, strapiConfigured ? "strapi+apps-script" : "apps-script");
       if (configResult.status === "rejected") {
         setSheetStatus("warning", "Product data loaded, but Config could not be loaded. Default pricing settings are being used.", { retry: true });
       } else {
@@ -1242,6 +1289,127 @@
 
   function isAppsScriptConfigured() {
     return /^https:\/\/script\.google\.com\/macros\/s\//i.test(APPS_SCRIPT_WEB_APP_URL);
+  }
+
+  function isStrapiConfigured() {
+    return /^https?:\/\//i.test(STRAPI_BASE_URL);
+  }
+
+  async function loadSavCatalogFromStrapi() {
+    const url = new URL("/api/sav-builder-options", STRAPI_BASE_URL);
+    url.searchParams.set("pagination[pageSize]", String(STRAPI_PAGE_SIZE));
+    url.searchParams.set("sort", "sortOrder:asc");
+    url.searchParams.set("populate[surfaceGuidance]", "*");
+    url.searchParams.set("populate[rollOptions]", "*");
+
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const timeout = window.setTimeout(() => controller?.abort(), STRAPI_REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        mode: "cors",
+        cache: "no-store",
+        signal: controller?.signal
+      });
+      if (!response.ok) throw new Error(`Strapi catalogue returned HTTP ${response.status}.`);
+
+      const payload = await response.json();
+      if (!Array.isArray(payload?.data)) throw new Error("Strapi catalogue response has no data array.");
+      return payload.data.map((entry) => entry?.attributes ? { ...entry.attributes, documentId: entry.documentId || entry.id } : entry);
+    } catch (error) {
+      if (error?.name === "AbortError") throw new Error("Strapi catalogue request timed out.");
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  async function mergeStrapiCatalog(selectorData, catalogEntries) {
+    const catalogBySourceKey = new Map(
+      catalogEntries
+        .filter((entry) => entry?.sourceKey)
+        .map((entry) => [String(entry.sourceKey), entry])
+    );
+
+    const mergedRows = [];
+    for (const row of selectorData.rows) {
+      const sourceKey = await buildSavSourceKey(row);
+      const entry = catalogBySourceKey.get(sourceKey);
+      if (!entry) continue;
+
+      const merged = mergeStrapiEntryIntoSelectorRow(row, entry);
+      if (merged) mergedRows.push(merged);
+    }
+
+    return { ...selectorData, rows: mergedRows };
+  }
+
+  function mergeStrapiEntryIntoSelectorRow(row, entry) {
+    const surfaceGuidance = Array.isArray(entry.surfaceGuidance) ? entry.surfaceGuidance : [];
+    const rowSurfaceKey = normalizeKey(row[MOUNTING_SURFACE_COLUMN]);
+    const surfaceInfo = surfaceGuidance.find((guidance) =>
+      normalizeKey(SURFACE_LABELS[guidance.surface] || guidance.surface) === rowSurfaceKey
+    );
+
+    if (rowSurfaceKey && !surfaceInfo) return null;
+
+    return {
+      ...row,
+      Product: String(entry.productName || row.Product || "").trim(),
+      Brand: String(entry.brand || "").trim(),
+      Class: String(entry.materialClass || "").trim(),
+      Longevity: String(entry.longevity || "").trim(),
+      Laminate: String(entry.laminateName || "").trim(),
+      "Product Spec Sheet": String(entry.productSpecSheetUrl || "").trim(),
+      "Laminate Spec Sheet": String(entry.laminateSpecSheetUrl || "").trim(),
+      "Surface Description": String(surfaceInfo?.description || "").trim(),
+      "Surface Link": String(surfaceInfo?.link || "").trim(),
+      White: toSelectorBoolean(entry.white),
+      "Air Release": toSelectorBoolean(entry.airRelease),
+      "Repositionable on Installation": toSelectorBoolean(entry.repositionable),
+      Removable: toSelectorBoolean(entry.removable),
+      "High-tac": toSelectorBoolean(entry.highTac),
+      Greyback: toSelectorBoolean(entry.greyback),
+      Translucent: toSelectorBoolean(entry.translucent),
+      Clear: toSelectorBoolean(entry.clear),
+      "Optically Clear": toSelectorBoolean(entry.opticallyClear),
+      "Perforated (One way Vision)": toSelectorBoolean(entry.perforated),
+      savDocumentId: entry.documentId || "",
+      savSourceKey: entry.sourceKey
+    };
+  }
+
+  function toSelectorBoolean(value) {
+    return value === true ? "TRUE" : "";
+  }
+
+  async function buildSavSourceKey(row) {
+    const productName = String(row.Product || "").trim();
+    const laminateName = String(row.Laminate || "").trim() || undefined;
+    const rolls = (Array.isArray(row.rolls) ? row.rolls : [])
+      .filter((roll) => Number.isInteger(roll.width) && roll.width > 0 && roll.qcode)
+      .map((roll) => ({ widthMm: roll.width, qcode: String(roll.qcode).trim() }))
+      .sort((left, right) => left.widthMm - right.widthMm);
+    const identity = JSON.stringify({ productName, laminateName, rolls });
+    const digest = await sha256Hex(identity);
+    return `${savSlugify(productName, 120) || "sav-option"}-${digest.slice(0, 16)}`;
+  }
+
+  async function sha256Hex(value) {
+    const bytes = new TextEncoder().encode(value);
+    const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  function savSlugify(value, maxLength) {
+    return String(value || "")
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, maxLength);
   }
 
   async function loadConfigFromAppsScript() {
