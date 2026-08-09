@@ -50,9 +50,11 @@ The app reads:
 GET /api/sav-builder-options
   ?pagination[pageSize]=200
   &sort=sortOrder:asc
-  &populate[surfaceGuidance]=*
-  &populate[rollOptions]=*
+  &populate=*
 ```
+
+`populate=*` is used so first-level components and media fields are included, including
+`surfaceGuidance`, `rollOptions`, `productSpecSheet` and `laminateSpecSheet`.
 
 Only published entries are returned by the public Content API. The protected
 `POST /api/sav-builder-options/resolve-qcode` route is reserved for the future server-side

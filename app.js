@@ -66,6 +66,8 @@
     { id: "all", label: "All", matches: [] },
     { id: "monomeric", label: "Monomeric (Good)", matches: ["Monomeric", "Mono"] },
     { id: "polymeric", label: "Polymeric (Better)", matches: ["Polymeric", "Poly"] },
+    { id: "intermediate-polymeric", label: "Intermediate Polymeric (Better)", matches: ["Intermediate Polymeric"], matchMode: "prefix" },
+    { id: "premium-polymeric", label: "Premium Polymeric (Better still)", matches: ["Premium Polymeric"], matchMode: "prefix" },
     { id: "cast", label: "Cast (Best)", matches: ["Cast"] }
   ];
   const LIMIT_FILTER_OPTIONS = [
@@ -1299,8 +1301,7 @@
     const url = new URL("/api/sav-builder-options", STRAPI_BASE_URL);
     url.searchParams.set("pagination[pageSize]", String(STRAPI_PAGE_SIZE));
     url.searchParams.set("sort", "sortOrder:asc");
-    url.searchParams.set("populate[surfaceGuidance]", "*");
-    url.searchParams.set("populate[rollOptions]", "*");
+    url.searchParams.set("populate", "*");
 
     const controller = typeof AbortController === "function" ? new AbortController() : null;
     const timeout = window.setTimeout(() => controller?.abort(), STRAPI_REQUEST_TIMEOUT_MS);
@@ -1354,6 +1355,16 @@
 
     if (rowSurfaceKey && !surfaceInfo) return null;
 
+    const productSpecSheet = getStrapiMediaUrl(
+      entry.productSpecSheet,
+      entry.produstSpecSheet,
+      entry.productSpecSheetUrl
+    );
+    const laminateSpecSheet = getStrapiMediaUrl(
+      entry.laminateSpecSheet,
+      entry.laminateSpecSheetUrl
+    );
+
     return {
       ...row,
       Product: String(entry.productName || row.Product || "").trim(),
@@ -1361,8 +1372,8 @@
       Class: String(entry.materialClass || "").trim(),
       Longevity: String(entry.longevity || "").trim(),
       Laminate: String(entry.laminateName || "").trim(),
-      "Product Spec Sheet": String(entry.productSpecSheetUrl || "").trim(),
-      "Laminate Spec Sheet": String(entry.laminateSpecSheetUrl || "").trim(),
+      "Product Spec Sheet": productSpecSheet,
+      "Laminate Spec Sheet": laminateSpecSheet,
       "Surface Description": String(surfaceInfo?.description || "").trim(),
       "Surface Link": String(surfaceInfo?.link || "").trim(),
       White: toSelectorBoolean(entry.white),
@@ -1378,6 +1389,45 @@
       savDocumentId: entry.documentId || "",
       savSourceKey: entry.sourceKey
     };
+  }
+
+  function getStrapiMediaUrl(...candidates) {
+    for (const candidate of candidates) {
+      const url = extractStrapiMediaUrl(candidate);
+      if (url) return url;
+    }
+    return "";
+  }
+
+  function extractStrapiMediaUrl(value) {
+    if (!value) return "";
+    if (typeof value === "string") return normalizeStrapiAssetUrl(value);
+
+    const data = value.data;
+    if (Array.isArray(data)) {
+      for (const item of data) {
+        const url = extractStrapiMediaUrl(item);
+        if (url) return url;
+      }
+    }
+    if (data) {
+      const url = extractStrapiMediaUrl(data);
+      if (url) return url;
+    }
+
+    const attributesUrl = value.attributes?.url;
+    if (attributesUrl) return normalizeStrapiAssetUrl(attributesUrl);
+    if (value.url) return normalizeStrapiAssetUrl(value.url);
+
+    return "";
+  }
+
+  function normalizeStrapiAssetUrl(value) {
+    const url = String(value || "").trim();
+    if (!url) return "";
+    if (/^https?:\/\//i.test(url)) return url;
+    if (url.startsWith("/")) return `${STRAPI_BASE_URL}${url}`;
+    return url;
   }
 
   function toSelectorBoolean(value) {
@@ -2241,7 +2291,10 @@
   function matchesClassOption(row, option) {
     if (!option || option.id === "all") return true;
     const classKey = normalizeKey(getClassFilterText(row));
-    return Boolean(classKey) && option.matches.some((match) => classKey.includes(normalizeKey(match)));
+    return Boolean(classKey) && option.matches.some((match) => {
+      const matchKey = normalizeKey(match);
+      return option.matchMode === "prefix" ? classKey.startsWith(matchKey) : classKey.includes(matchKey);
+    });
   }
 
   function matchesLimitFilters(row) {
