@@ -2752,10 +2752,10 @@
   function compareRollOptions(a, b) {
     return (
       a.joins - b.joins ||
+      a.costs.total - b.costs.total ||
       Number(b.unrotatedFitsAll) - Number(a.unrotatedFitsAll) ||
       b.unrotatedFitCount - a.unrotatedFitCount ||
       a.selectedPack.lengthMm - b.selectedPack.lengthMm ||
-      a.costs.total - b.costs.total ||
       a.roll.width - b.roll.width
     );
   }
