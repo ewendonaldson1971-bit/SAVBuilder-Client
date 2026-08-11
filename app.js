@@ -27,6 +27,11 @@
     (APP_MODE === "dev" ? new URLSearchParams(window.location.search).get("strapi") : "") ||
     ""
   ).trim().replace(/\/+$/, "");
+  const PRICING_API_URL = String(
+    window.SAV_BUILDER_PRICING_API_URL ||
+    APP_SCRIPT_ELEMENT?.dataset?.pricingApiUrl ||
+    ""
+  ).trim().replace(/\/+$/, "");
   const PDF_ICON_SRC = "assets/icons/pdf-file-icon.webp?v=1";
 
   const TILE_OFFSET_MM = 5;
@@ -219,7 +224,10 @@
     currentBest: null,
     currentOptions: [],
     currentCartUrls: [],
-    currentCartLines: []
+    currentCartLines: [],
+    pricingApiToken: window.sessionStorage.getItem("savBuilderPricingToken") || "",
+    pricingApiUser: window.sessionStorage.getItem("savBuilderPricingUser") || "",
+    pricingQuoteRequestId: 0
   };
 
   const ui = {};
@@ -253,6 +261,7 @@
     initRecommendationPanelSizing();
     recalculate();
     refreshProducts();
+    renderPricingConnection();
   }
 
   function cacheUi() {
@@ -311,6 +320,15 @@
     ui.impositionSummary = document.getElementById("imposition-summary");
     ui.impositionPreview = document.getElementById("imposition-preview");
     ui.stockOptionsPanel = document.getElementById("widths-title")?.closest("section");
+    ui.pricingConnection = document.getElementById("pricing-connection");
+    ui.pricingConnectionLabel = document.getElementById("pricing-connection-label");
+    ui.pricingLogin = document.getElementById("pricing-login");
+    ui.pricingLoginForm = document.getElementById("pricing-login-form");
+    ui.pricingLoginClose = document.getElementById("pricing-login-close");
+    ui.pricingLoginCancel = document.getElementById("pricing-login-cancel");
+    ui.pricingUsername = document.getElementById("pricing-username");
+    ui.pricingPassword = document.getElementById("pricing-password");
+    ui.pricingLoginError = document.getElementById("pricing-login-error");
   }
 
   function applyAppMode() {
@@ -323,6 +341,17 @@
   }
 
   function attachEvents() {
+    ui.pricingConnection?.addEventListener("click", () => {
+      if (state.pricingApiToken && window.confirm(`Disconnect ${state.pricingApiUser || "the current user"} from the Pricing Service?`)) {
+        clearPricingSession();
+        return;
+      }
+      ui.pricingLogin?.showModal();
+      ui.pricingUsername?.focus();
+    });
+    ui.pricingLoginClose?.addEventListener("click", () => ui.pricingLogin.close());
+    ui.pricingLoginCancel?.addEventListener("click", () => ui.pricingLogin.close());
+    ui.pricingLoginForm?.addEventListener("submit", connectPricingService);
     document.querySelectorAll(".help-button").forEach((button) => {
       button.addEventListener("pointerdown", (event) => event.stopPropagation());
       button.addEventListener("keydown", (event) => event.stopPropagation());
@@ -1700,6 +1729,128 @@
     renderArtworkList(parsed.elements);
     renderResults(best, ranked, parsed.elements);
     renderConfiguratorGuidance(selectorState, parsed.elements, best);
+    requestAuthoritativeQuote(product, parsed.elements, settings);
+  }
+
+  function renderPricingConnection(status = "") {
+    if (!ui.pricingConnection || !ui.pricingConnectionLabel) return;
+    const connected = Boolean(state.pricingApiToken);
+    ui.pricingConnection.classList.toggle("is-connected", connected);
+    ui.pricingConnection.classList.toggle("is-working", status === "working");
+    ui.pricingConnectionLabel.textContent = status === "working"
+      ? "Checking price…"
+      : connected
+        ? `Pricing: ${state.pricingApiUser || "connected"}`
+        : "Connect pricing";
+    ui.pricingConnection.title = connected ? "Authoritative backend pricing is connected. Click to disconnect." : "Sign in to use authoritative backend pricing.";
+  }
+
+  async function connectPricingService(event) {
+    event.preventDefault();
+    const username = String(ui.pricingUsername?.value || "").trim();
+    const password = String(ui.pricingPassword?.value || "");
+    if (!username || !password || !PRICING_API_URL) return;
+    const submit = ui.pricingLoginForm.querySelector("button[type='submit']");
+    submit.disabled = true;
+    ui.pricingLoginError.textContent = "";
+    try {
+      const response = await fetch(`${PRICING_API_URL}/api/auth/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.token) throw new Error(payload.error || "Could not connect to the Pricing Service.");
+      state.pricingApiToken = payload.token;
+      state.pricingApiUser = payload.user?.username || username;
+      window.sessionStorage.setItem("savBuilderPricingToken", state.pricingApiToken);
+      window.sessionStorage.setItem("savBuilderPricingUser", state.pricingApiUser);
+      ui.pricingPassword.value = "";
+      ui.pricingLogin.close();
+      renderPricingConnection();
+      showAppToast("Authoritative Pricing Service connected.");
+      recalculate();
+    } catch (error) {
+      ui.pricingLoginError.textContent = error?.message || "Could not connect to the Pricing Service.";
+    } finally {
+      submit.disabled = false;
+    }
+  }
+
+  function clearPricingSession() {
+    state.pricingApiToken = "";
+    state.pricingApiUser = "";
+    state.pricingQuoteRequestId += 1;
+    window.sessionStorage.removeItem("savBuilderPricingToken");
+    window.sessionStorage.removeItem("savBuilderPricingUser");
+    renderPricingConnection();
+    showAppToast("Pricing Service disconnected.");
+    recalculate();
+  }
+
+  async function requestAuthoritativeQuote(product, elements, settings) {
+    if (!PRICING_API_URL || !state.pricingApiToken || !product?.rolls?.length || !elements.length) {
+      renderPricingConnection();
+      return;
+    }
+    const requestId = ++state.pricingQuoteRequestId;
+    renderPricingConnection("working");
+    try {
+      const response = await fetch(`${PRICING_API_URL}/api/v1/pricing/sav-builder/quote`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${state.pricingApiToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          qcodes: product.rolls.map((roll) => roll.qcode).filter(Boolean),
+          printMode: product.printMode || "",
+          settings,
+          elements: elements.map((element) => ({ shortname: element.shortname, quantity: element.quantity, widthMm: element.width, heightMm: element.height }))
+        })
+      });
+      const quote = await response.json();
+      if (requestId !== state.pricingQuoteRequestId) return;
+      if (response.status === 401) {
+        clearPricingSession();
+        showAppToast("Your Pricing Service session expired. Please connect again.", "error");
+        return;
+      }
+      if (!response.ok) throw new Error(quote.error || "Authoritative pricing failed.");
+      applyAuthoritativeQuote(quote, elements);
+      renderPricingConnection();
+    } catch (error) {
+      if (requestId !== state.pricingQuoteRequestId) return;
+      renderPricingConnection();
+      showAppToast(`${error?.message || "Authoritative pricing failed."} Showing the local estimate.`, "error");
+    }
+  }
+
+  function applyAuthoritativeQuote(quote, elements) {
+    const qcode = String(quote?.source?.qcode || "").trim();
+    const localBest = state.currentOptions.find((option) => String(option.roll.qcode || "").trim() === qcode);
+    if (!localBest || !quote.imposition || !quote.costs) return;
+    const alternatives = new Map((quote.alternatives || []).map((option) => [String(option.qcode || "").trim(), option]));
+    const ranked = state.currentOptions.map((option) => {
+      const authoritative = alternatives.get(String(option.roll.qcode || "").trim());
+      return authoritative ? { ...option, costs: { ...option.costs, total: authoritative.total }, selectedPack: { ...option.selectedPack, lengthMm: authoritative.printLengthMm }, joins: authoritative.joins } : option;
+    }).sort(compareRollOptions);
+    const evenPack = quote.imposition.evenPack || localBest.evenPack;
+    const offsetPack = quote.imposition.offsetPack || localBest.offsetPack;
+    const selectedPack = quote.imposition.offsetJoinsUsed ? offsetPack : evenPack;
+    const best = {
+      ...localBest,
+      costs: quote.costs,
+      joins: quote.imposition.joins,
+      offsetSaves: quote.imposition.offsetSaves,
+      offsetJoinsUsed: quote.imposition.offsetJoinsUsed,
+      elementPlans: quote.imposition.elementPlans,
+      evenPack,
+      offsetPack,
+      selectedPack: { ...selectedPack, placements: quote.imposition.placements, truncated: quote.imposition.placementsTruncated, lengthMm: quote.imposition.printLengthMm },
+      roll: { ...localBest.roll, printableWidth: quote.imposition.printableWidthMm }
+    };
+    state.currentBest = best;
+    state.currentOptions = ranked;
+    renderResults(best, ranked, elements);
+    showAppToast("Price verified by the Vivad Pricing Service.");
   }
 
   function getSettings() {

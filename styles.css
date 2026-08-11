@@ -2658,3 +2658,19 @@ th,
     font-size: 0.92rem;
   }
 }
+.pricing-connection { gap: 8px; }
+.connection-dot { width: 8px; height: 8px; border-radius: 50%; background: #a7adb3; box-shadow: 0 0 0 3px rgba(167,173,179,.16); }
+.pricing-connection.is-connected .connection-dot { background: #7cbf1d; box-shadow: 0 0 0 3px rgba(124,191,29,.16); }
+.pricing-connection.is-working .connection-dot { background: #478fe1; animation: pricing-pulse 1s ease-in-out infinite; }
+.pricing-login-dialog { width: min(460px, calc(100% - 32px)); border: 0; border-radius: 16px; padding: 0; color: #24262a; box-shadow: 0 28px 90px rgba(20,24,28,.3); }
+.pricing-login-dialog::backdrop { background: rgba(25,29,33,.55); backdrop-filter: blur(3px); }
+.pricing-login-dialog form { padding: 24px; }
+.pricing-login-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
+.pricing-login-heading h2 { margin: 0; color: #53565a; font: 700 24px/1.1 Cabin, sans-serif; }
+.pricing-login-heading button { width: 32px; height: 32px; border: 0; border-radius: 50%; background: #f1f3f5; color: #53565a; font-size: 20px; cursor: pointer; }
+.pricing-login-dialog form > p { color: #71777d; font-size: 12px; line-height: 1.55; }
+.pricing-login-dialog .field { margin-top: 14px; }
+.pricing-login-dialog .field input { width: 100%; box-sizing: border-box; }
+.pricing-login-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 22px; padding-top: 17px; border-top: 1px solid #d8dadd; }
+.pricing-login-actions button { min-width: 92px; }
+@keyframes pricing-pulse { 50% { opacity: .35; transform: scale(.82); } }

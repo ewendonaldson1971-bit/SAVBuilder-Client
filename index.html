@@ -19,6 +19,9 @@
         </div>
       </div>
       <div class="header-actions">
+        <button class="ghost-button pricing-connection" id="pricing-connection" type="button" aria-haspopup="dialog">
+          <span class="connection-dot"></span><span id="pricing-connection-label">Connect pricing</span>
+        </button>
         <button class="ghost-button" id="open-gsheet" type="button">
           <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
           Open GSheet
@@ -306,12 +309,24 @@
       </section>
     </main>
 
+    <dialog id="pricing-login" class="pricing-login-dialog">
+      <form id="pricing-login-form" method="dialog">
+        <div class="pricing-login-heading"><div><p class="eyebrow">Vivad secure access</p><h2>Connect Pricing Service</h2></div><button type="button" id="pricing-login-close" aria-label="Close">×</button></div>
+        <p>Use your Vivalux login. Your password is sent directly to the Vivad Pricing Service and is never stored by SAV Builder.</p>
+        <label class="field"><span>Username</span><input id="pricing-username" autocomplete="username" required></label>
+        <label class="field"><span>Password</span><input id="pricing-password" type="password" autocomplete="current-password" required></label>
+        <div id="pricing-login-error" class="error-list" role="alert"></div>
+        <div class="pricing-login-actions"><button class="ghost-button" type="button" id="pricing-login-cancel">Cancel</button><button class="primary-button" type="submit">Connect</button></div>
+      </form>
+    </dialog>
+
     <script src="pdfjs/pdf.classic.js"></script>
     <script src="pdfjs/pdf.worker.classic.js"></script>
     <script
       src="app.js?v=apps-script-load-reliability-20260721"
       data-apps-script-url="https://script.google.com/macros/s/AKfycbwN0Ocx_0jE9VD4nQLOAV9NaycPF9pRDe4Z3GmUTfLKWamcJjmz48MxdB7AQ6xlZrCu/exec"
       data-strapi-url="https://strapi.vivad.com.au"
+      data-pricing-api-url="https://vivad-pricing-configurator.vivad-gpt-0611.chatgpt.site"
     ></script>
   </body>
 </html>
