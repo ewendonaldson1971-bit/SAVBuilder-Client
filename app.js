@@ -1834,7 +1834,6 @@
     state.currentBest = best;
     state.currentOptions = ranked;
     renderResults(best, ranked, elements);
-    showAppToast("Price verified by the Vivad Pricing Service.");
   }
 
   function renderAuthoritativeQuotePending() {
