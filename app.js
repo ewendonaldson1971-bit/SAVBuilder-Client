@@ -60,7 +60,10 @@
     { id: "translucent", label: "Translucent", columns: ["Translucent"] },
     { id: "clear", label: "Clear", columns: ["Clear"] },
     { id: "optically-clear", label: "Optically Clear", columns: ["Optically Clear"] },
-    { id: "perforated", label: "Perforated (One Way Vision)", columns: ["Perforated", "Perforated (One way Vision)", "Perforated (One Way Vision)"] }
+    { id: "perforated", label: "Perforated (One Way Vision)", columns: ["Perforated", "Perforated (One way Vision)", "Perforated (One Way Vision)"] },
+    { id: "reflective", label: "Reflective", columns: ["Reflective"] },
+    { id: "specialty", label: "Specialty", columns: ["Specialty"] },
+    { id: "black-back", label: "Black back", columns: ["Black back", "Black Back", "Blackback"] }
   ];
   const MOUNTING_SURFACE_ALL = "all";
   const MOUNTING_SURFACE_COLUMN = "Mounting Surface";
@@ -1347,6 +1350,9 @@
       Clear: toSelectorBoolean(entry.clear),
       "Optically Clear": toSelectorBoolean(entry.opticallyClear),
       "Perforated (One way Vision)": toSelectorBoolean(entry.perforated),
+      Reflective: toSelectorBoolean(entry.reflective),
+      Specialty: toSelectorBoolean(entry.specialty),
+      "Black back": toSelectorBoolean(entry.blackBack),
       savDocumentId: entry.documentId || "",
       availablePrintModes: entry.availablePrintModes || {},
       rolls,
