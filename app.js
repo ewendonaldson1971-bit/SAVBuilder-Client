@@ -94,6 +94,8 @@
   const LONGEVITY_COLUMN = "Longevity";
   const LAMINATE_COLUMN = "Laminate";
   const PRINT_MODE_COLUMN = "Print Mode";
+  const GENERAL_DESCRIPTION_COLUMN = "General Description";
+  const GENERAL_LINK_COLUMN = "General Link";
   const SURFACE_DESCRIPTION_COLUMN = "Surface Description";
   const SURFACE_LINK_COLUMN = "Surface Link";
   const PRODUCT_SPEC_SHEET_COLUMNS = [
@@ -1409,8 +1411,6 @@
       normalizeKey(SURFACE_LABELS[guidance.surface] || guidance.surface) === rowSurfaceKey
     );
 
-    if (rowSurfaceKey && !surfaceInfo) return null;
-
     const productSpecSheet = getStrapiMediaUrl(
       entry.productSpecSheet,
       entry.produstSpecSheet,
@@ -1430,6 +1430,8 @@
       Laminate: String(entry.laminateName || "").trim(),
       "Product Spec Sheet": productSpecSheet,
       "Laminate Spec Sheet": laminateSpecSheet,
+      [GENERAL_DESCRIPTION_COLUMN]: String(entry.generalDescription || "").trim(),
+      [GENERAL_LINK_COLUMN]: String(entry.generalLink || "").trim(),
       "Surface Description": String(surfaceInfo?.description || "").trim(),
       "Surface Link": String(surfaceInfo?.link || "").trim(),
       White: toSelectorBoolean(entry.white),
@@ -2784,6 +2786,8 @@
     const laminates = getSortedSelectorChoices(productRows, LAMINATE_COLUMN);
     const productSpecSheet = getFirstRowValueForColumns(productRows, PRODUCT_SPEC_SHEET_COLUMNS);
     const laminateSpecSheet = getFirstRowValueForColumns(productRows, LAMINATE_SPEC_SHEET_COLUMNS);
+    const generalDescription = getFirstRowValueForColumns(productRows, [GENERAL_DESCRIPTION_COLUMN]);
+    const generalLink = getFirstRowValueForColumns(productRows, [GENERAL_LINK_COLUMN]);
 
     return {
       name: productName.trim(),
@@ -2798,6 +2802,8 @@
       laminates,
       productSpecSheet,
       laminateSpecSheet,
+      generalDescription,
+      generalLink,
       selectorRow: productRows[0],
       selectorSelections: { ...selections }
     };
@@ -4362,6 +4368,7 @@
         ${renderProductLongevity(product)}
         ${renderProductMountingSurfaces(product)}
         ${renderProductSpecSheetLinks(product)}
+        ${renderProductGeneralInfo(product)}
         ${renderProductSurfaceInfo(product)}
       </div>
     ` : (!selectorState.question ? renderSelectorEmptyState(selectorState) : "");
@@ -4532,6 +4539,20 @@
     if (!longevities.length) return "";
     const label = longevities.length === 1 ? "Longevity" : "Longevities";
     return `<div class="muted">${escapeHtml(`${label}: ${longevities.join(", ")}`)}</div>`;
+  }
+
+  function renderProductGeneralInfo(product) {
+    const description = String(product.generalDescription || "").trim();
+    const link = normalizePreviewUrl(product.generalLink);
+    if (!description && !link) return "";
+
+    return `
+      <div class="product-general-info">
+        <div class="product-surface-label">General information</div>
+        ${description ? `<div class="product-description">${formatDescription(description)}</div>` : ""}
+        ${link ? renderOpenGraphPreviewShell(link) : ""}
+      </div>
+    `;
   }
 
   function renderProductSurfaceInfo(product) {

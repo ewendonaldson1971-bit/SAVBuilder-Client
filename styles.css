@@ -1212,6 +1212,11 @@ h2 {
   gap: 9px;
 }
 
+.product-general-info {
+  display: grid;
+  gap: 7px;
+}
+
 .product-surface-detail {
   display: grid;
   gap: 7px;
