@@ -22,10 +22,6 @@
         <button class="ghost-button pricing-connection" id="pricing-connection" type="button" aria-haspopup="dialog">
           <span class="connection-dot"></span><span id="pricing-connection-label">Connect pricing</span>
         </button>
-        <button class="ghost-button" id="open-gsheet" type="button">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
-          Open GSheet
-        </button>
         <a class="ghost-button action-link" href="https://vivad.com.au/shopping-cart" target="savBuilderCart">
           <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6h15l-2 8H8L6 3H3M9 19a1 1 0 1 0 0 .01M18 19a1 1 0 1 0 0 .01"/></svg>
           Open Cart
@@ -78,14 +74,14 @@
         <div class="filters-panel" aria-labelledby="filters-panel-title">
           <div id="filters-panel-title" class="filters-panel-title">Filters</div>
           <div class="filters-panel-body">
-            <div class="mounting-filter" aria-labelledby="mounting-filter-title">
-              <span id="mounting-filter-title">Mounting Surface</span>
-              <div id="mounting-surface-selector" class="mounting-surface-selector" aria-label="Mounting surface filter"></div>
-            </div>
-
             <div class="brand-filter" aria-labelledby="brand-filter-title">
               <span id="brand-filter-title">Brand</span>
               <div id="brand-selector" class="brand-selector" aria-label="Brand filter"></div>
+            </div>
+
+            <div class="mounting-filter" aria-labelledby="mounting-filter-title">
+              <span id="mounting-filter-title">Mounting Surface</span>
+              <div id="mounting-surface-selector" class="mounting-surface-selector" aria-label="Mounting surface filter"></div>
             </div>
 
             <div class="class-filter" aria-labelledby="class-filter-title">
@@ -326,7 +322,7 @@
     <script src="pdfjs/pdf.classic.js"></script>
     <script src="pdfjs/pdf.worker.classic.js"></script>
     <script
-      src="app.js?v=general-guidance-20260822"
+      src="app.js?v=product-options-20260822"
       data-apps-script-url="https://script.google.com/macros/s/AKfycbwN0Ocx_0jE9VD4nQLOAV9NaycPF9pRDe4Z3GmUTfLKWamcJjmz48MxdB7AQ6xlZrCu/exec"
       data-strapi-url="https://strapi.vivad.com.au"
       data-pricing-api-url="https://vivadpricing-app.calmtree-53cc02bb.australiasoutheast.azurecontainerapps.io"

@@ -1,6 +1,6 @@
 # Strapi integration
 
-This branch introduces the staged SAV Builder cutover from Google Sheets to Strapi.
+The SAV Builder catalogue is supplied by Strapi and pricing is supplied by the Pricing Engine.
 
 ## Current stage
 
@@ -11,15 +11,13 @@ When a Strapi URL is configured, Strapi becomes authoritative for:
 - material-property filters
 - mounting-surface descriptions and links
 - specification-sheet links
+- the available stock widths and their public QCodes
 
-The existing Apps Script feed temporarily supplies product/laminate costs, pricing Config
-values and QCodes. The browser joins both feeds by the Strapi importer's stable `sourceKey`.
-If Strapi is configured but unavailable, the selector fails closed instead of quoting an
-unpublished or stale configuration.
-
-This is a transition state. The Sheet and Apps Script can be retired only after a trusted
-server endpoint supplies quotes and resolves QCodes. The final cart flow must not accept a
-browser-authored `price` as binding.
+The browser does not load costs or pricing configuration. It sends the selected product's
+QCodes, elements, print mode and advanced options to the authenticated Pricing Engine. The
+Pricing Engine resolves each QCode through JobTalk/APIM and returns the selected width,
+server-generated layout and element prices. If either Strapi or the Pricing Engine is
+unavailable, the builder fails closed instead of producing a local estimate.
 
 ## Configure
 
@@ -40,7 +38,7 @@ http://localhost:8888/?mode=dev&strapi=http://127.0.0.1:1337
 ```
 
 The Strapi environment must grant the Public role `find` and `findOne` permission for
-`sav-builder-option`. The private QCode field is omitted from these responses.
+`sav-builder-option`. QCodes are returned; costs and pricing formulas are not stored in Strapi.
 
 ## Expected Strapi query
 
@@ -48,7 +46,8 @@ The app reads:
 
 ```text
 GET /api/sav-builder-options
-  ?pagination[pageSize]=200
+  ?pagination[pageSize]=100
+  &pagination[page]=<each page>
   &sort=sortOrder:asc
   &populate=*
 ```
@@ -56,6 +55,5 @@ GET /api/sav-builder-options
 `populate=*` is used so first-level components and media fields are included, including
 `surfaceGuidance`, `rollOptions`, `productSpecSheet` and `laminateSpecSheet`.
 
-Only published entries are returned by the public Content API. The protected
-`POST /api/sav-builder-options/resolve-qcode` route is reserved for the future server-side
-quote/cart adapter and must never be called with a token embedded in this static app.
+Only published entries are returned by the public Content API. The browser never needs a
+Strapi API token and does not use `sourceKey` to join pricing data.
