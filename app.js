@@ -2091,6 +2091,7 @@
     const mountingSurface = row[MOUNTING_SURFACE_COLUMN];
     const values = [
       row.Product,
+      row[BRAND_COLUMN],
       mountingSurface,
       getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, mountingSurface),
       row.Laminate,
@@ -2121,11 +2122,12 @@
     const terms = getProductSearchTerms(query);
     if (!normalizedQuery && !terms.length) return "";
 
-    return getAvailableMountingSurfaceChoices().find((choice) =>
+    const matches = getAvailableMountingSurfaceChoices().filter((choice) =>
       getMountingSurfaceSearchLabels(choice).some((label) =>
         matchesMountingSurfaceSearchLabel(label, normalizedQuery, terms)
       )
-    ) || "";
+    );
+    return matches.length === 1 ? matches[0] : "";
   }
 
   function getMountingSurfaceSearchLabels(choice) {
@@ -2146,11 +2148,10 @@
   function matchesMountingSurfaceSearchLabel(label, normalizedQuery, terms) {
     const labelKey = normalizeKey(label);
     if (!labelKey) return false;
-    if (normalizedQuery && (labelKey === normalizedQuery || (normalizedQuery.length >= 3 && labelKey.includes(normalizedQuery)))) {
-      return true;
-    }
+    if (normalizedQuery && labelKey === normalizedQuery) return true;
+    const labelTerms = getProductSearchTerms(label);
     return terms.some((term) =>
-      term.length >= 3 && (labelKey === term || labelKey.includes(term))
+      term.length >= 3 && labelTerms.includes(term)
     );
   }
 
@@ -2378,7 +2379,7 @@
       const question = getDisplaySelectorColumn(selectorState.question.label);
       const count = selectorState.completeProductCount || selectorState.candidates.length;
       title = `Choose ${question}`;
-      body = `${formatInteger(count)} matching ${count === 1 ? "product" : "products"} remain. Search can still jump straight to a product, QCode or mounting surface.`;
+      body = `${formatInteger(count)} matching ${count === 1 ? "product" : "products"} remain. Search can still jump straight to a product, brand, QCode or mounting surface.`;
       target = "selector";
     } else if (!hasProduct) {
       title = "Choose a product";
