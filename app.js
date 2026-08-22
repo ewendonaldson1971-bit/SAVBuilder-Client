@@ -59,7 +59,7 @@
     }
   });
   const BRAND_COLUMN = "Brand";
-  const BRAND_OPTIONS = [
+  const FALLBACK_BRAND_OPTIONS = [
     { id: "all", label: "All", matches: [] },
     { id: "avery", label: "Avery", matches: ["Avery"], logo: "assets/brands/avery-dennison.png?v=2" },
     { id: "orafol", label: "Orafol", matches: ["Orafol"], logo: "assets/brands/orafol.svg?v=2" },
@@ -208,6 +208,7 @@
     selectorSelections: {},
     pricingConfig: { ...DEFAULT_PRICING_CONFIG },
     brandFilter: "all",
+    brandOptions: FALLBACK_BRAND_OPTIONS.map((option) => ({ ...option })),
     classFilter: "all",
     limitFilters: new Set(),
     mountingSurfaceFilter: MOUNTING_SURFACE_ALL,
@@ -383,7 +384,11 @@
       const button = event.target.closest("[data-brand-filter]");
       if (!button) return;
       const brandFilter = button.dataset.brandFilter;
-      if (!getBrandOption(brandFilter) || state.brandFilter === brandFilter) return;
+      if (!getBrandOption(brandFilter)) return;
+      if (state.brandFilter === brandFilter) {
+        ui.brandSelector.querySelector("details")?.removeAttribute("open");
+        return;
+      }
       state.brandFilter = brandFilter;
       state.productSearchSelection = null;
       state.productSearchQuery = "";
@@ -393,6 +398,19 @@
       renderBrandSelector();
       renderMountingSurfaceSelector();
       recalculate();
+    });
+
+    ui.brandSelector.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      const dropdown = ui.brandSelector.querySelector("details");
+      if (!dropdown?.open) return;
+      dropdown.open = false;
+      dropdown.querySelector("summary")?.focus();
+    });
+
+    document.addEventListener("click", (event) => {
+      if (ui.brandSelector.contains(event.target)) return;
+      ui.brandSelector.querySelector("details")?.removeAttribute("open");
     });
 
     ui.classSelector.addEventListener("click", (event) => {
@@ -1256,11 +1274,20 @@
     setSheetStatus("loading", "Loading SAV catalogue...");
 
     const strapiConfigured = isStrapiConfigured();
-    const [configResult, selectorResult, strapiResult] = await Promise.allSettled([
+    const [configResult, selectorResult, strapiResult, brandResult] = await Promise.allSettled([
       loadConfigFromAppsScript(),
       loadSelectorFromAppsScript(),
-      strapiConfigured ? loadSavCatalogFromStrapi() : Promise.resolve(null)
+      strapiConfigured ? loadSavCatalogFromStrapi() : Promise.resolve(null),
+      strapiConfigured ? loadBrandsFromStrapi() : Promise.resolve(null)
     ]);
+
+    if (strapiConfigured && brandResult.status === "fulfilled" && brandResult.value?.length) {
+      applyStrapiBrands(brandResult.value);
+    } else {
+      state.brandOptions = FALLBACK_BRAND_OPTIONS.map((option) => ({ ...option }));
+      if (!getBrandOption(state.brandFilter, false)) state.brandFilter = "all";
+      renderBrandSelector();
+    }
 
     state.pricingConfig = configResult.status === "fulfilled"
       ? { ...DEFAULT_PRICING_CONFIG, ...configResult.value }
@@ -1418,6 +1445,57 @@
       savDocumentId: entry.documentId || "",
       savSourceKey: entry.sourceKey
     };
+  }
+
+  async function loadBrandsFromStrapi() {
+    const url = new URL("/api/brands", STRAPI_BASE_URL);
+    url.searchParams.set("pagination[pageSize]", "100");
+    url.searchParams.set("sort", "sortOrder:asc");
+    url.searchParams.set("populate[logo]", "true");
+
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const timeout = window.setTimeout(() => controller?.abort(), STRAPI_REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        mode: "cors",
+        cache: "no-store",
+        signal: controller?.signal
+      });
+      if (!response.ok) throw new Error(`Strapi brands returned HTTP ${response.status}.`);
+
+      const payload = await response.json();
+      if (!Array.isArray(payload?.data)) throw new Error("Strapi brands response has no data array.");
+      return payload.data.map((entry) => entry?.attributes ? { ...entry.attributes, documentId: entry.documentId || entry.id } : entry);
+    } catch (error) {
+      if (error?.name === "AbortError") throw new Error("Strapi brands request timed out.");
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  function applyStrapiBrands(entries) {
+    const brands = entries.map((entry) => {
+      const label = String(entry?.name || "").trim();
+      const id = savSlugify(String(entry?.key || label), 120);
+      if (!label || !id) return null;
+      return {
+        id,
+        label,
+        matches: [label, String(entry?.key || "").trim()].filter(Boolean),
+        logo: getStrapiMediaUrl(entry?.logo)
+      };
+    }).filter((brand) => brand?.logo);
+
+    if (!brands.length) return;
+    state.brandOptions = [
+      { id: "all", label: "All", matches: [] },
+      ...brands
+    ];
+    if (!getBrandOption(state.brandFilter, false)) state.brandFilter = "all";
+    renderBrandSelector();
   }
 
   function getStrapiMediaUrl(...candidates) {
@@ -2356,18 +2434,32 @@
 
   function renderBrandSelector() {
     if (!ui.brandSelector) return;
-    ui.brandSelector.innerHTML = BRAND_OPTIONS.map((option) => {
+    const current = getBrandOption(state.brandFilter);
+    const renderLogo = (option) => option.logo
+      ? `<img class="brand-option-logo" src="${escapeHtml(option.logo)}" alt="" aria-hidden="true">`
+      : `<span class="brand-all-mark" aria-hidden="true">ALL</span>`;
+    const options = state.brandOptions.map((option) => {
       const selected = option.id === state.brandFilter;
-      const logo = option.logo
-        ? `<img src="${escapeHtml(option.logo)}" alt="" aria-hidden="true">`
-        : "";
       return `
-        <button class="brand-button${selected ? " selected" : ""}" type="button" data-brand-filter="${escapeHtml(option.id)}" role="radio" aria-checked="${selected ? "true" : "false"}">
-          ${logo}
-          <span>${escapeHtml(option.label)}</span>
+        <button class="brand-dropdown-option${selected ? " selected" : ""}" type="button" data-brand-filter="${escapeHtml(option.id)}" role="option" aria-selected="${selected ? "true" : "false"}">
+          <span class="brand-option-media">${renderLogo(option)}</span>
+          <span class="brand-option-name">${escapeHtml(option.id === "all" ? "All brands" : option.label)}</span>
+          <span class="brand-option-check" aria-hidden="true">✓</span>
         </button>
       `;
     }).join("");
+    ui.brandSelector.innerHTML = `
+      <details class="brand-dropdown">
+        <summary class="brand-dropdown-trigger" aria-label="Select brand: ${escapeHtml(current.id === "all" ? "All brands" : current.label)}">
+          <span class="brand-option-media">${renderLogo(current)}</span>
+          <span class="brand-option-name">${escapeHtml(current.id === "all" ? "All brands" : current.label)}</span>
+          <span class="brand-dropdown-chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="brand-dropdown-menu" role="listbox" aria-label="Brands">
+          ${options}
+        </div>
+      </details>
+    `;
   }
 
   function renderClassSelector() {
@@ -2491,8 +2583,9 @@
     ].filter(Boolean).join(" ");
   }
 
-  function getBrandOption(id) {
-    return BRAND_OPTIONS.find((option) => option.id === id) || BRAND_OPTIONS[0];
+  function getBrandOption(id, useFallback = true) {
+    const option = state.brandOptions.find((candidate) => candidate.id === id);
+    return option || (useFallback ? state.brandOptions[0] : null);
   }
 
   function getClassOption(id) {
