@@ -1908,8 +1908,15 @@
     const alternatives = new Map((quote.alternatives || []).map((option) => [String(option.qcode || "").trim(), option]));
     const ranked = state.currentOptions.map((option) => {
       const authoritative = alternatives.get(String(option.roll.qcode || "").trim());
-      return authoritative ? { ...option, costs: { ...option.costs, total: authoritative.total }, selectedPack: { ...option.selectedPack, lengthMm: authoritative.printLengthMm }, joins: authoritative.joins } : option;
+      return authoritative ? {
+        ...option,
+        costs: { ...option.costs, total: authoritative.total },
+        selectedPack: { ...option.selectedPack, lengthMm: authoritative.printLengthMm },
+        joins: authoritative.joins,
+        roll: applyAuthoritativeStockInventory(option.roll, authoritative)
+      } : option;
     }).sort(compareRollOptions);
+    const bestAuthoritative = alternatives.get(qcode) || quote.source || {};
     const evenPack = quote.imposition.evenPack || localBest.evenPack;
     const offsetPack = quote.imposition.offsetPack || localBest.offsetPack;
     const selectedPack = quote.imposition.offsetJoinsUsed ? offsetPack : evenPack;
@@ -1923,12 +1930,29 @@
       evenPack,
       offsetPack,
       selectedPack: { ...selectedPack, placements: quote.imposition.placements, truncated: quote.imposition.placementsTruncated, lengthMm: quote.imposition.printLengthMm },
-      roll: { ...localBest.roll, printableWidth: quote.imposition.printableWidthMm }
+      roll: { ...applyAuthoritativeStockInventory(localBest.roll, bestAuthoritative), printableWidth: quote.imposition.printableWidthMm }
     };
     state.currentBest = best;
     state.currentOptions = ranked;
     renderResults(best, ranked, elements);
     showAppToast("Price verified by the Vivad Pricing Service.");
+  }
+
+  function applyAuthoritativeStockInventory(roll, inventory) {
+    return {
+      ...roll,
+      jtCodeProduct: String(inventory?.jtCodeProduct || "").trim(),
+      jtCodeLaminate: String(inventory?.jtCodeLaminate || "").trim(),
+      qohProduct: normalizeQoh(inventory?.qohProduct),
+      qohLaminate: normalizeQoh(inventory?.qohLaminate),
+      inventorySource: String(inventory?.inventorySource || "").trim()
+    };
+  }
+
+  function normalizeQoh(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
   }
 
   function getSettings() {
@@ -4910,13 +4934,16 @@
   function renderOptions(options, best) {
     ui.optionCount.textContent = `${options.length} stock widths`;
     ui.optionsBody.innerHTML = options.map((option) => {
-      const selected = option === best ? " class=\"selected-row\"" : "";
+      const selected = String(option.roll.qcode || "") === String(best.roll.qcode || "") ? " class=\"selected-row\"" : "";
       const offsetText = option.offsetSaves
         ? `${formatNumber(option.offsetPack.lengthMm / 1000, 2)} m`
         : "No saving";
       return `
         <tr${selected}>
           <td>${escapeHtml(formatRollWidthLabel(option.roll))}</td>
+          <td><code>${escapeHtml(option.roll.qcode || "—")}</code></td>
+          <td>${escapeHtml(formatStockQoh(option.roll.qohProduct))}</td>
+          <td>${escapeHtml(formatLaminateStockQoh(option.roll))}</td>
           <td>${formatInteger(option.joins)}</td>
           <td>${formatNumber(option.evenPack.lengthMm / 1000, 2)} m</td>
           <td>${offsetText}</td>
@@ -5574,6 +5601,20 @@
 
   function formatInteger(value) {
     return new Intl.NumberFormat("en-AU", { maximumFractionDigits: 0 }).format(value || 0);
+  }
+
+  function formatStockQoh(value) {
+    const number = normalizeQoh(value);
+    return number === null
+      ? "—"
+      : new Intl.NumberFormat("en-AU", { maximumFractionDigits: 2 }).format(number);
+  }
+
+  function formatLaminateStockQoh(roll) {
+    const value = normalizeQoh(roll?.qohLaminate);
+    if (value !== null) return formatStockQoh(value);
+    if (roll?.inventorySource === "vivtrack" && !roll?.jtCodeLaminate) return "N/A";
+    return "—";
   }
 
   function formatCartPrice(value) {
