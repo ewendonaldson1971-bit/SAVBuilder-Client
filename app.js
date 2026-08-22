@@ -170,7 +170,7 @@
     selectorSelections: {},
     brandFilter: "all",
     brandOptions: FALLBACK_BRAND_OPTIONS.map((option) => ({ ...option })),
-    classFilter: "all",
+    classFilters: new Set(CLASS_OPTIONS.slice(1).map((option) => option.id)),
     limitFilters: new Set(),
     mountingSurfaceFilter: MOUNTING_SURFACE_ALL,
     selectedProduct: null,
@@ -375,8 +375,14 @@
       const button = event.target.closest("[data-class-filter]");
       if (!button) return;
       const classFilter = button.dataset.classFilter;
-      if (!getClassOption(classFilter) || state.classFilter === classFilter) return;
-      state.classFilter = classFilter;
+      if (!getClassOption(classFilter, false)) return;
+      if (classFilter === "all") {
+        state.classFilters = new Set(getSelectableClassOptions().map((option) => option.id));
+      } else if (state.classFilters.has(classFilter)) {
+        state.classFilters.delete(classFilter);
+      } else {
+        state.classFilters.add(classFilter);
+      }
       state.productSearchSelection = null;
       state.productSearchQuery = "";
       ui.productSearch.value = "";
@@ -630,7 +636,7 @@
   function resetSurveyAndFilters() {
     state.selectorSelections = {};
     state.brandFilter = "all";
-    state.classFilter = "all";
+    state.classFilters = new Set(getSelectableClassOptions().map((option) => option.id));
     state.limitFilters.clear();
     state.mountingSurfaceFilter = MOUNTING_SURFACE_ALL;
     state.productSearchSelection = null;
@@ -645,7 +651,7 @@
 
   function clearSelectorFilters() {
     state.brandFilter = "all";
-    state.classFilter = "all";
+    state.classFilters = new Set(getSelectableClassOptions().map((option) => option.id));
     state.limitFilters.clear();
     state.mountingSurfaceFilter = MOUNTING_SURFACE_ALL;
     state.productSearchSelection = null;
@@ -2352,7 +2358,7 @@
     return [
       state.mountingSurfaceFilter !== MOUNTING_SURFACE_ALL,
       state.brandFilter !== "all",
-      state.classFilter !== "all",
+      state.classFilters.size !== getSelectableClassOptions().length,
       state.limitFilters.size > 0
     ].filter(Boolean).length;
   }
@@ -2407,10 +2413,11 @@
 
   function renderClassSelector() {
     if (!ui.classSelector) return;
+    const allSelected = state.classFilters.size === getSelectableClassOptions().length;
     ui.classSelector.innerHTML = CLASS_OPTIONS.map((option) => {
-      const selected = option.id === state.classFilter;
+      const selected = option.id === "all" ? allSelected : state.classFilters.has(option.id);
       return `
-        <button class="class-button${selected ? " selected" : ""}" type="button" data-class-filter="${escapeHtml(option.id)}" role="radio" aria-checked="${selected ? "true" : "false"}">
+        <button class="class-button${selected ? " selected" : ""}" type="button" data-class-filter="${escapeHtml(option.id)}" aria-pressed="${selected ? "true" : "false"}">
           <span>${escapeHtml(option.label)}</span>
         </button>
       `;
@@ -2464,8 +2471,15 @@
 
   function matchesBaseFilters(row) {
     return matchesBrandOption(row, getBrandOption(state.brandFilter)) &&
-      matchesClassOption(row, getClassOption(state.classFilter)) &&
+      matchesSelectedClassOptions(row) &&
       matchesLimitFilters(row);
+  }
+
+  function matchesSelectedClassOptions(row) {
+    if (!state.classFilters.size) return false;
+    return getSelectableClassOptions()
+      .filter((option) => state.classFilters.has(option.id))
+      .some((option) => matchesClassOption(row, option));
   }
 
   function matchesBrandOption(row, option) {
@@ -2531,8 +2545,13 @@
     return option || (useFallback ? state.brandOptions[0] : null);
   }
 
-  function getClassOption(id) {
-    return CLASS_OPTIONS.find((option) => option.id === id) || CLASS_OPTIONS[0];
+  function getClassOption(id, useFallback = true) {
+    const option = CLASS_OPTIONS.find((candidate) => candidate.id === id);
+    return option || (useFallback ? CLASS_OPTIONS[0] : null);
+  }
+
+  function getSelectableClassOptions() {
+    return CLASS_OPTIONS.filter((option) => option.id !== "all");
   }
 
   function getLimitFilterOption(id) {
@@ -4495,7 +4514,7 @@
   function hasActiveSelectorFilters() {
     return state.mountingSurfaceFilter !== MOUNTING_SURFACE_ALL ||
       state.brandFilter !== "all" ||
-      state.classFilter !== "all" ||
+      state.classFilters.size !== getSelectableClassOptions().length ||
       state.limitFilters.size > 0 ||
       Boolean(state.productSearchQuery.trim());
   }
