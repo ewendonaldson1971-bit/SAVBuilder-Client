@@ -93,6 +93,9 @@
   const TYPE_COLUMN = "Type";
   const LONGEVITY_COLUMN = "Longevity";
   const LAMINATE_COLUMN = "Laminate";
+  const NO_LAMINATE_VALUE = "__no_laminate__";
+  const NO_LAMINATE_LABEL = "No laminate";
+  const MAX_PRODUCT_ROLLS = 2;
   const PRINT_MODE_COLUMN = "Print Mode";
   const SURFACE_DESCRIPTION_COLUMN = "Surface Description";
   const SURFACE_LINK_COLUMN = "Surface Link";
@@ -2232,9 +2235,7 @@
   }
 
   function getCommonSelectorValue(rows, column) {
-    const values = Array.from(new Set(rows
-      .map((row) => String(row[column] || "").trim())
-      .filter(isMeaningfulSelectorValue)));
+    const values = getDistinctValues(rows, column).filter(isMeaningfulSelectorValue);
     return values.length === 1 ? values[0] : "";
   }
 
@@ -2242,7 +2243,7 @@
     return state.selectorRows.filter((row) =>
       matchesSelectedFilters(row) &&
       Object.entries(selections).every(([column, value]) =>
-        isSyntheticSelectorColumn(column) || !value || String(row[column] || "") === value
+        isSyntheticSelectorColumn(column) || !value || selectorRowMatchesValue(row, column, value)
       )
     );
   }
@@ -2601,6 +2602,7 @@
   }
 
   function getDisplaySelectorValue(column, value) {
+    if (isLaminateColumnName(column) && value === NO_LAMINATE_VALUE) return NO_LAMINATE_LABEL;
     return String(value || "").trim();
   }
 
@@ -2760,9 +2762,13 @@
     const productSpecSheet = getFirstRowValueForColumns(productRows, PRODUCT_SPEC_SHEET_COLUMNS);
     const laminateSpecSheet = getFirstRowValueForColumns(productRows, LAMINATE_SPEC_SHEET_COLUMNS);
 
+    const rolls = Array.from(rollsByWidth.values())
+      .sort((a, b) => a.width - b.width)
+      .slice(0, MAX_PRODUCT_ROLLS);
+
     return {
       name: productName.trim(),
-      rolls: Array.from(rollsByWidth.values()).sort((a, b) => a.width - b.width),
+      rolls,
       printSqmRate,
       printMode: printModeOption?.label || "",
       surfaceDescription,
@@ -2804,8 +2810,20 @@
   }
 
   function getDistinctValues(rows, column) {
-    const values = Array.from(new Set(rows.map((row) => String(row[column] || "").trim()).filter(Boolean)));
+    const values = Array.from(new Set(rows
+      .map((row) => getSelectorRowValue(row, column))
+      .filter(Boolean)));
     return isPerforationColumnName(column) ? values.sort(comparePerforationChoices) : values;
+  }
+
+  function getSelectorRowValue(row, column) {
+    const value = String(row[column] || "").trim();
+    if (isLaminateColumnName(column) && !value) return NO_LAMINATE_VALUE;
+    return value;
+  }
+
+  function selectorRowMatchesValue(row, column, value) {
+    return getSelectorRowValue(row, column) === String(value || "").trim();
   }
 
   function getSortedSelectorChoices(rows, column) {
@@ -2823,7 +2841,7 @@
 
   function sortLaminateChoicesByCost(rows, choices) {
     return sortChoicesByCost(choices, (choice) =>
-      getMinimumRollCost(rows.filter((row) => String(row[LAMINATE_COLUMN] || "").trim() === choice), "laminateCost")
+      getMinimumRollCost(rows.filter((row) => selectorRowMatchesValue(row, LAMINATE_COLUMN, choice)), "laminateCost")
     );
   }
 
@@ -4473,7 +4491,8 @@
       : [];
     if (!laminates.length) return "";
     const label = laminates.length === 1 ? "Laminate" : "Laminates";
-    return `<div class="muted">${escapeHtml(`${label}: ${laminates.join(", ")}`)}</div>`;
+    const displayValues = laminates.map((value) => getDisplaySelectorValue(LAMINATE_COLUMN, value));
+    return `<div class="muted">${escapeHtml(`${label}: ${displayValues.join(", ")}`)}</div>`;
   }
 
   function renderProductSpecSheetLinks(product) {
@@ -5452,7 +5471,13 @@
 
     return [
       ...getSelectorSelectionEmailLines(product),
-      getArraySummaryLine("Laminate", "Laminates", product.laminates),
+      getArraySummaryLine(
+        "Laminate",
+        "Laminates",
+        Array.isArray(product.laminates)
+          ? product.laminates.map((value) => getDisplaySelectorValue(LAMINATE_COLUMN, value))
+          : []
+      ),
       product.printMode ? `Print mode: ${product.printMode}` : "",
       getArraySummaryLine("Mounting surface", "Mounting surfaces", getDisplayMountingSurfaceValues(product.mountingSurfaces)),
       getArraySummaryLine("Longevity", "Longevities", product.longevities),
