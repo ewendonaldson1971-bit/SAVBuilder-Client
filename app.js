@@ -1405,6 +1405,7 @@
       "Product Spec Sheet": productSpecSheet,
       "Laminate Spec Sheet": laminateSpecSheet,
       galleryImages: getStrapiMediaItems(entry.galleryImages),
+      generalImage: getStrapiMediaItems(entry.generalImage)[0] || null,
       [GENERAL_DESCRIPTION_COLUMN]: String(entry.generalDescription || "").trim(),
       [GENERAL_LINK_COLUMN]: String(entry.generalLink || "").trim(),
       "Surface Description": String(surfaceInfo?.description || "").trim(),
@@ -2831,6 +2832,7 @@
     const laminateSpecSheet = getFirstRowValueForColumns(productRows, LAMINATE_SPEC_SHEET_COLUMNS);
     const generalDescription = getFirstRowValueForColumns(productRows, [GENERAL_DESCRIPTION_COLUMN]);
     const generalLink = getFirstRowValueForColumns(productRows, [GENERAL_LINK_COLUMN]);
+    const generalImage = productRows.find((row) => row.generalImage?.url)?.generalImage || null;
     const galleryImages = getProductGalleryImages(productRows);
 
     return {
@@ -2847,6 +2849,7 @@
       laminateSpecSheet,
       generalDescription,
       generalLink,
+      generalImage,
       galleryImages,
       selectorRow: productRows[0],
       selectorSelections: { ...selections }
@@ -4486,13 +4489,15 @@
 
   function renderProductGeneralInfo(product) {
     const description = String(product.generalDescription || "").trim();
+    const imageUrl = normalizePreviewUrl(product.generalImage?.url);
     const link = normalizePreviewUrl(product.generalLink);
-    if (!description && !link) return "";
+    if (!description && !imageUrl && !link) return "";
 
     return `
       <div class="product-general-info">
         <div class="product-surface-label">General information</div>
         ${description ? `<div class="product-description">${formatDescription(description)}</div>` : ""}
+        ${imageUrl ? renderImagePreviewShell(imageUrl) : ""}
         ${link ? renderOpenGraphPreviewShell(link) : ""}
       </div>
     `;

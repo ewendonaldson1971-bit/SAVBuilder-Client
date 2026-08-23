@@ -12,6 +12,12 @@ test("loads the Strapi multiple-media gallery on SAV catalogue rows", () => {
   assert.match(app, /media\.formats\?\.thumbnail \|\| media\.formats\?\.small/);
 });
 
+test("maps and renders the Strapi general image beneath the general description", () => {
+  assert.match(app, /generalImage:\s*getStrapiMediaItems\(entry\.generalImage\)\[0\] \|\| null/);
+  assert.match(app, /const generalImage = productRows\.find\(\(row\) => row\.generalImage\?\.url\)\?\.generalImage \|\| null/);
+  assert.match(app, /\$\{description \? `<div class="product-description">\$\{formatDescription\(description\)\}<\/div>` : ""\}\s*\$\{imageUrl \? renderImagePreviewShell\(imageUrl\) : ""\}/);
+});
+
 test("shows a thumbnail-led gallery control when a product has images", () => {
   assert.match(app, /if \(!count\) return "";/);
   assert.match(app, /class="product-gallery-trigger-media"/);
