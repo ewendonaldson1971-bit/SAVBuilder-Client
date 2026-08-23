@@ -120,7 +120,7 @@
   ];
   const DERIVED_PERFORATION_COLUMN = "Perforation";
   const CART_WINDOW_NAME = "savBuilderCart";
-  const CART_NAVIGATION_DELAY_MS = 1200;
+  const CART_PAGE_URL = "https://vivad.com.au/shopping-cart";
   const IMPOSITION_EMAIL_TO = "sales@vivad.com.au";
   const IMPOSITION_EMAIL_SUBJECT = "SavBuilder imposition submitted";
   const IMPOSITION_EMAIL_ACTION = "email-imposition";
@@ -224,8 +224,10 @@
     artworkErrors: [],
     currentBest: null,
     currentOptions: [],
-    currentCartUrls: [],
     currentCartLines: [],
+    currentCartRequest: null,
+    authoritativeQuoteReady: false,
+    cartSubmissionBusy: false,
     pricingApiToken: window.sessionStorage.getItem("savBuilderPricingToken") || "",
     pricingApiUser: window.sessionStorage.getItem("savBuilderPricingUser") || "",
     pricingQuoteRequestId: 0
@@ -602,6 +604,7 @@
     ui.addAllCartButtons.forEach((button) => {
       button.addEventListener("click", addAllToCart);
     });
+    ui.pricingBody?.addEventListener("click", handleCartLineClick);
   }
 
   function initRecommendationPanelSizing() {
@@ -1767,6 +1770,9 @@
   }
 
   function recalculate() {
+    state.pricingQuoteRequestId += 1;
+    state.currentCartRequest = null;
+    state.authoritativeQuoteReady = false;
     const parsed = parseElements(ui.jobInput.value);
     renderInputErrors(parsed.errors);
     reconcileArtworkMappings(parsed.elements);
@@ -1859,6 +1865,8 @@
     state.pricingApiToken = "";
     state.pricingApiUser = "";
     state.pricingQuoteRequestId += 1;
+    state.currentCartRequest = null;
+    state.authoritativeQuoteReady = false;
     window.sessionStorage.removeItem("savBuilderPricingToken");
     window.sessionStorage.removeItem("savBuilderPricingUser");
     renderPricingConnection();
@@ -1868,21 +1876,23 @@
 
   async function requestAuthoritativeQuote(product, elements, settings) {
     if (!PRICING_API_URL || !state.pricingApiToken || !product?.rolls?.length || !elements.length) {
+      state.currentCartRequest = null;
+      state.authoritativeQuoteReady = false;
+      syncCartButtons();
       renderPricingConnection();
       return;
     }
+    const requestPayload = buildSavQuoteRequest(product, elements, settings);
+    state.currentCartRequest = requestPayload;
+    state.authoritativeQuoteReady = false;
+    syncCartButtons();
     const requestId = ++state.pricingQuoteRequestId;
     renderPricingConnection("working");
     try {
       const response = await fetch(`${PRICING_API_URL}/api/v1/pricing/sav-builder/quote`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${state.pricingApiToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          qcodes: product.rolls.map((roll) => roll.qcode).filter(Boolean),
-          printMode: product.printMode || "",
-          settings,
-          elements: elements.map((element) => ({ shortname: element.shortname, quantity: element.quantity, widthMm: element.width, heightMm: element.height }))
-        })
+        body: JSON.stringify(requestPayload)
       });
       const quote = await response.json();
       if (requestId !== state.pricingQuoteRequestId) return;
@@ -1899,6 +1909,20 @@
       renderPricingConnection();
       showAppToast(`${error?.message || "Authoritative pricing failed."} Showing the local estimate.`, "error");
     }
+  }
+
+  function buildSavQuoteRequest(product, elements, settings) {
+    return {
+      qcodes: product.rolls.map((roll) => roll.qcode).filter(Boolean),
+      printMode: product.printMode || "",
+      settings,
+      elements: elements.map((element) => ({
+        shortname: element.shortname,
+        quantity: element.quantity,
+        widthMm: element.width,
+        heightMm: element.height
+      }))
+    };
   }
 
   function applyAuthoritativeQuote(quote, elements) {
@@ -1927,6 +1951,7 @@
     };
     state.currentBest = best;
     state.currentOptions = ranked;
+    state.authoritativeQuoteReady = true;
     renderResults(best, ranked, elements);
     showAppToast("Price verified by the Vivad Pricing Service.");
   }
@@ -4271,8 +4296,9 @@
     ui.offsetPrompt.classList.add("hidden");
     ui.optionsBody.innerHTML = "";
     ui.pricingBody.innerHTML = "";
-    state.currentCartUrls = [];
     state.currentCartLines = [];
+    state.currentCartRequest = null;
+    state.authoritativeQuoteReady = false;
     setAddAllCartButtonsDisabled(true);
     ui.optionCount.textContent = "";
     ui.priceSummary.textContent = "";
@@ -4296,8 +4322,9 @@
     ui.offsetPrompt.classList.add("hidden");
     ui.optionsBody.innerHTML = "";
     ui.pricingBody.innerHTML = "";
-    state.currentCartUrls = [];
     state.currentCartLines = [];
+    state.currentCartRequest = null;
+    state.authoritativeQuoteReady = false;
     setAddAllCartButtonsDisabled(true);
     ui.optionCount.textContent = "";
     ui.priceSummary.textContent = "";
@@ -4928,8 +4955,8 @@
 
   function renderPricing(best, elements) {
     ui.priceSummary.textContent = `${formatMoney(best.costs.total)} over ${formatNumber(best.costs.finishedAreaSqm, 2)} sqm finished area`;
-    const cartUrls = [];
     const cartLines = [];
+    const canSubmit = canSubmitCart();
     ui.pricingBody.innerHTML = elements.map((element, index) => {
       const plan = best.elementPlans.find((item) => item.elementIndex === index);
       const areaSqm = (element.width * element.height) / 1000000;
@@ -4938,10 +4965,10 @@
       const unit = element.quantity > 0 ? lineTotal / element.quantity : 0;
       const printSize = `${formatNumber(plan.printWidth, 0)} x ${formatNumber(plan.printHeight, 0)} mm${plan.rotated ? " rotated" : ""}`;
       const dropsText = plan.drops > 1 ? `${formatInteger(plan.drops)} vertical` : formatInteger(plan.drops);
-      const cartUrl = buildCartUrl(best.roll, element, unit, best.printMode, best.offsetJoinsUsed);
-      if (cartUrl) {
-        cartUrls.push(cartUrl);
+      const hasQCode = Boolean(best.roll?.qcode);
+      if (hasQCode) {
         cartLines.push({
+          lineIndex: index,
           shortname: getCartShortname(element.shortname, best.printMode, best.offsetJoinsUsed),
           enteredShortname: element.shortname,
           quantity: element.quantity,
@@ -4952,8 +4979,7 @@
           areaSqm: lineArea,
           unit,
           lineTotal,
-          qcode: best.roll.qcode,
-          cartUrl
+          qcode: best.roll.qcode
         });
       }
       return `
@@ -4966,26 +4992,12 @@
           <td>${formatNumber(lineArea, 2)} sqm</td>
           <td>${formatMoney(unit)}</td>
           <td>${formatMoney(lineTotal)}</td>
-          <td>${cartUrl ? `<a class="cart-link" href="${escapeHtml(cartUrl)}" target="${CART_WINDOW_NAME}">Add</a>` : `<span class="muted">No QCode</span>`}</td>
+          <td>${hasQCode ? `<button class="cart-link" type="button" data-cart-line-index="${index}"${canSubmit ? "" : " disabled"}>Add</button>` : `<span class="muted">No QCode</span>`}</td>
         </tr>
       `;
     }).join("");
-    state.currentCartUrls = cartUrls;
     state.currentCartLines = cartLines;
-    setAddAllCartButtonsDisabled(!cartUrls.length);
-  }
-
-  function buildCartUrl(roll, element, unitPrice, printMode = "", offsetJoinsUsed = false) {
-    if (!roll || !roll.qcode) return "";
-    const params = new URLSearchParams({
-      qcode: roll.qcode,
-      quantity: String(element.quantity),
-      width: String(Math.round(element.width)),
-      height: String(Math.round(element.height)),
-      shortname: getCartShortname(element.shortname, printMode, offsetJoinsUsed),
-      price: formatCartPrice(unitPrice)
-    });
-    return `https://vivad.com.au/shopping-cart?${params.toString()}`;
+    syncCartButtons();
   }
 
   function getCartShortname(shortname, printMode, offsetJoinsUsed = false) {
@@ -4996,42 +5008,77 @@
   }
 
   async function addAllToCart() {
-    const urls = state.currentCartUrls.slice();
-    if (!urls.length) return;
+    await submitCartLines();
+  }
+
+  function handleCartLineClick(event) {
+    const button = event.target.closest("[data-cart-line-index]");
+    if (!button || !ui.pricingBody.contains(button)) return;
+    const lineIndex = Number(button.dataset.cartLineIndex);
+    if (!Number.isInteger(lineIndex)) return;
+    submitCartLines([lineIndex]);
+  }
+
+  async function submitCartLines(lineIndexes) {
+    if (state.cartSubmissionBusy) return;
+    if (!state.pricingApiToken) {
+      showAppToast("Connect the Pricing Service before adding items to the cart.", "error");
+      return;
+    }
+    if (!canSubmitCart()) {
+      showAppToast("Wait for the Pricing Service to verify this quote before adding it to the cart.", "warning");
+      return;
+    }
+
+    const requestedIndexes = Array.isArray(lineIndexes) ? lineIndexes.slice() : null;
+    const selectedLines = requestedIndexes
+      ? state.currentCartLines.filter((line) => requestedIndexes.includes(line.lineIndex))
+      : state.currentCartLines.slice();
+    if (!selectedLines.length) return;
 
     const originalLabels = new Map(ui.addAllCartButtons.map((button) => [button, button.textContent]));
-    setAddAllCartButtonsDisabled(true);
-    let cartWindow = window.open(urls[0], CART_WINDOW_NAME);
-    let addToCartEmailError = null;
-    const addToCartEmailPromise = submitAddToCartEmail({
-      bodyText: buildAddToCartEmailBody(),
-      lineCount: state.currentCartLines.length,
-      total: state.currentBest ? formatMoney(state.currentBest.costs.total) : ""
-    }).catch((error) => {
-      addToCartEmailError = error;
-    });
+    const cartWindow = window.open(CART_PAGE_URL, CART_WINDOW_NAME);
+    state.cartSubmissionBusy = true;
+    syncCartButtons();
+    setAddAllCartButtonsText(selectedLines.length === 1 ? "Adding…" : `Adding 0/${selectedLines.length}`);
 
     try {
-      for (let index = 0; index < urls.length; index += 1) {
-        setAddAllCartButtonsText(`Adding ${index + 1}/${urls.length}`);
-        if (index > 0) {
-          await wait(CART_NAVIGATION_DELAY_MS);
-          cartWindow = navigateCartTab(urls[index], cartWindow);
-        }
+      const requestBody = { ...state.currentCartRequest };
+      if (requestedIndexes) requestBody.lineIndexes = requestedIndexes;
+      const response = await fetch(`${PRICING_API_URL}/api/v1/cart/sav-builder/lines`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${state.pricingApiToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody)
+      });
+      const payload = await readJsonResponse(response);
+      if (response.status === 401) {
+        clearPricingSession();
+        throw new Error("Your Pricing Service session expired. Please connect again.");
       }
+      if (!response.ok || payload?.isSuccess !== true) {
+        if (Number(payload?.addedCount) > 0) navigateCartTab(CART_PAGE_URL, cartWindow);
+        throw new Error(payload?.error || "The cart service could not add the selected item.");
+      }
+
+      navigateCartTab(CART_PAGE_URL, cartWindow);
+      showAppToast(getAddToCartToastMessage(payload.addedCount || selectedLines.length), "success");
+      submitAddToCartEmail({
+        bodyText: buildAddToCartEmailBody(selectedLines),
+        lineCount: selectedLines.length,
+        total: selectedLines.length === state.currentCartLines.length && state.currentBest ? formatMoney(state.currentBest.costs.total) : ""
+      }).catch((error) => {
+        window.setTimeout(() => {
+          showAppToast(error?.message || "The cart was updated, but the add-to-cart email could not be sent.", "warning", { timeoutMs: 5600 });
+        }, 900);
+      });
+    } catch (error) {
+      showAppToast(error?.message || "The cart service could not add the selected item.", "error", { timeoutMs: 7000 });
     } finally {
-      await wait(250);
-      await addToCartEmailPromise;
+      state.cartSubmissionBusy = false;
       ui.addAllCartButtons.forEach((button) => {
         button.textContent = originalLabels.get(button) || "Add all to cart";
       });
-      setAddAllCartButtonsDisabled(!state.currentCartUrls.length);
-      showAppToast(getAddToCartToastMessage(urls.length), "success");
-      if (addToCartEmailError) {
-        window.setTimeout(() => {
-          showAppToast(addToCartEmailError?.message || "Cart opened, but the add-to-cart email could not be sent.", "warning", { timeoutMs: 5600 });
-        }, 900);
-      }
+      syncCartButtons();
     }
   }
 
@@ -5046,6 +5093,33 @@
     (ui.addAllCartButtons || []).forEach((button) => {
       button.disabled = disabled;
     });
+  }
+
+  function canSubmitCart() {
+    return Boolean(
+      PRICING_API_URL &&
+      state.pricingApiToken &&
+      state.authoritativeQuoteReady &&
+      state.currentCartRequest &&
+      state.currentCartLines.length &&
+      !state.cartSubmissionBusy
+    );
+  }
+
+  function syncCartButtons() {
+    const enabled = canSubmitCart();
+    setAddAllCartButtonsDisabled(!enabled);
+    ui.pricingBody?.querySelectorAll("[data-cart-line-index]").forEach((button) => {
+      button.disabled = !enabled;
+    });
+  }
+
+  async function readJsonResponse(response) {
+    try {
+      return await response.json();
+    } catch (error) {
+      return null;
+    }
   }
 
   function setAddAllCartButtonsText(text) {
@@ -5379,7 +5453,7 @@
     }
   }
 
-  function buildAddToCartEmailBody() {
+  function buildAddToCartEmailBody(cartLines = state.currentCartLines) {
     const best = state.currentBest;
     const product = state.selectedProduct;
     if (!best) return "SAVBuilder Add to cart";
@@ -5395,14 +5469,14 @@
       ...getSelectedRollEmailLines(best),
       "",
       "Cart lines",
-      ...getAddToCartLineEmailLines()
+      ...getAddToCartLineEmailLines(cartLines)
     ];
 
     return normalizeEmailBodyLines(lines);
   }
 
-  function getAddToCartLineEmailLines() {
-    const lines = Array.isArray(state.currentCartLines) ? state.currentCartLines : [];
+  function getAddToCartLineEmailLines(cartLines = state.currentCartLines) {
+    const lines = Array.isArray(cartLines) ? cartLines : [];
     if (!lines.length) return ["No cart lines were available."];
 
     return lines.flatMap((line, index) => [
@@ -5416,7 +5490,7 @@
       `Unit price: ${formatMoney(line.unit)}`,
       `Line total: ${formatMoney(line.lineTotal)}`,
       line.qcode ? `QCode: ${line.qcode}` : "",
-      `Product cart: ${line.cartUrl}`,
+      "Submission: Pricing Engine via APIM",
       ""
     ]);
   }
@@ -5576,10 +5650,6 @@
     return new Intl.NumberFormat("en-AU", { maximumFractionDigits: 0 }).format(value || 0);
   }
 
-  function formatCartPrice(value) {
-    return Number.isFinite(value) ? value.toFixed(2) : "0.00";
-  }
-
   function formatRollLabel(roll) {
     const qcode = roll.qcode ? ` · ${roll.qcode}` : "";
     return `${formatRollWidthLabel(roll)}${qcode}`;
@@ -5611,7 +5681,8 @@
     parseConfigCsv,
     parseSelectorCsv,
     evaluateRoll,
-    buildCartUrl,
+    buildSavQuoteRequest,
+    getCartShortname,
     constants: {
       TILE_OFFSET_MM,
       MATERIAL_LOADING_MM,
