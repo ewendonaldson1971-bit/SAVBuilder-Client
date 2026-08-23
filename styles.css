@@ -1333,8 +1333,14 @@ h2 {
   border-radius: 7px;
   background: #fff;
   color: var(--ink);
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  text-align: left;
   text-decoration: none;
 }
+
+button.og-preview { cursor: pointer; }
 
 .og-preview:hover {
   border-color: var(--green);

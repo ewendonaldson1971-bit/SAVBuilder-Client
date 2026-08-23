@@ -27,3 +27,10 @@ test("provides an accessible modal gallery with complete navigation", () => {
   assert.match(app, /\$\{state\.productGalleryIndex \+ 1\} of \$\{images\.length\}/);
   assert.match(styles, /\.product-gallery-dialog::backdrop/);
 });
+
+test("opens guidance image previews in the controlled product gallery", () => {
+  assert.match(app, /data-product-image-preview="\$\{escapeHtml\(url\)\}"/);
+  assert.match(app, /openProductGallery\(state\.selectedProduct, imagePreview\.dataset\.productImagePreview\)/);
+  assert.match(app, /images\.findIndex\(\(image\) => normalizePreviewUrl\(image\.url\) === normalizedInitialUrl\)/);
+  assert.doesNotMatch(app, /<a class="og-preview image-preview"[^>]+target="_blank"/);
+});
