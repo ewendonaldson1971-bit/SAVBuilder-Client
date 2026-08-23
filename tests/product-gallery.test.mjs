@@ -24,6 +24,7 @@ test("shows a thumbnail-led gallery control when a product has images", () => {
   assert.match(app, /<strong>View gallery<\/strong>/);
   assert.match(app, /class="product-gallery-trigger-count"/);
   assert.match(app, /data-product-gallery-open="true"/);
+  assert.match(app, /\$\{renderProductGeneralInfo\(product\)\}\s*\$\{renderProductGalleryControl\(product\)\}/);
 });
 
 test("opens the gallery from the preview product before print mode or laminate is selected", () => {

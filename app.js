@@ -4235,9 +4235,9 @@
           <div class="muted">${escapeHtml(product.rolls.map(formatRollLabel).join(" | "))}</div>
           ${renderProductLongevity(product)}
           ${renderProductMountingSurfaces(product)}
-          ${renderProductGalleryControl(product)}
           ${renderProductSpecSheetLinks(product)}
           ${renderProductGeneralInfo(product)}
+          ${renderProductGalleryControl(product)}
           ${renderProductSurfaceInfo(product)}
         </div>
       </div>
