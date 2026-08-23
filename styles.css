@@ -1677,9 +1677,10 @@ button:disabled {
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
 }
 
-.cart-link:hover {
+.cart-link:hover:not(:disabled) {
   background: var(--green-dark);
   border-color: var(--green-dark);
 }
@@ -2343,7 +2344,7 @@ button:disabled {
 
 #add-all-cart:hover:not(:disabled),
 #fixed-add-all-cart:hover:not(:disabled),
-.cart-link:hover {
+.cart-link:hover:not(:disabled) {
   border-color: var(--vivad-success-dark);
   background: var(--vivad-success-dark);
   box-shadow: 0 8px 18px rgba(116, 191, 47, 0.30);
