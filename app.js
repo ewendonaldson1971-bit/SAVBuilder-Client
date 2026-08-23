@@ -176,6 +176,7 @@
     limitFilters: new Set(),
     mountingSurfaceFilter: MOUNTING_SURFACE_ALL,
     selectedProduct: null,
+    galleryProduct: null,
     productSearchQuery: "",
     productSearchResults: [],
     productSearchSelection: null,
@@ -422,7 +423,9 @@
       const classFilter = button.dataset.classFilter;
       if (!getClassOption(classFilter, false)) return;
       if (classFilter === "all") {
-        state.classFilters = new Set(getSelectableClassOptions().map((option) => option.id));
+        const selectableClassIds = getSelectableClassOptions().map((option) => option.id);
+        const allSelected = selectableClassIds.every((id) => state.classFilters.has(id));
+        state.classFilters = allSelected ? new Set() : new Set(selectableClassIds);
       } else if (state.classFilters.has(classFilter)) {
         state.classFilters.delete(classFilter);
       } else {
@@ -481,12 +484,12 @@
 
       if (imagePreview) {
         event.preventDefault();
-        openProductGallery(state.selectedProduct, imagePreview.dataset.productImagePreview);
+        openProductGallery(state.galleryProduct, imagePreview.dataset.productImagePreview);
         return;
       }
 
       if (galleryTrigger) {
-        openProductGallery(state.selectedProduct);
+        openProductGallery(state.galleryProduct);
         return;
       }
 
@@ -1402,6 +1405,7 @@
       "Product Spec Sheet": productSpecSheet,
       "Laminate Spec Sheet": laminateSpecSheet,
       galleryImages: getStrapiMediaItems(entry.galleryImages),
+      generalImage: getStrapiMediaItems(entry.generalImage)[0] || null,
       [GENERAL_DESCRIPTION_COLUMN]: String(entry.generalDescription || "").trim(),
       [GENERAL_LINK_COLUMN]: String(entry.generalLink || "").trim(),
       "Surface Description": String(surfaceInfo?.description || "").trim(),
@@ -1748,6 +1752,7 @@
     reconcileArtworkMappings(parsed.elements);
     const selectorState = getSelectorState();
     state.selectedProduct = selectorState.product;
+    state.galleryProduct = selectorState.product || selectorState.previewProduct;
     renderProductSearch();
     renderSelectorSurvey(selectorState);
     renderConfiguratorProgress(selectorState, parsed.elements);
@@ -2827,6 +2832,7 @@
     const laminateSpecSheet = getFirstRowValueForColumns(productRows, LAMINATE_SPEC_SHEET_COLUMNS);
     const generalDescription = getFirstRowValueForColumns(productRows, [GENERAL_DESCRIPTION_COLUMN]);
     const generalLink = getFirstRowValueForColumns(productRows, [GENERAL_LINK_COLUMN]);
+    const generalImage = productRows.find((row) => row.generalImage?.url)?.generalImage || null;
     const galleryImages = getProductGalleryImages(productRows);
 
     return {
@@ -2843,6 +2849,7 @@
       laminateSpecSheet,
       generalDescription,
       generalLink,
+      generalImage,
       galleryImages,
       selectorRow: productRows[0],
       selectorSelections: { ...selections }
@@ -4228,9 +4235,9 @@
           <div class="muted">${escapeHtml(product.rolls.map(formatRollLabel).join(" | "))}</div>
           ${renderProductLongevity(product)}
           ${renderProductMountingSurfaces(product)}
-          ${renderProductGalleryControl(product)}
           ${renderProductSpecSheetLinks(product)}
           ${renderProductGeneralInfo(product)}
+          ${renderProductGalleryControl(product)}
           ${renderProductSurfaceInfo(product)}
         </div>
       </div>
@@ -4482,13 +4489,15 @@
 
   function renderProductGeneralInfo(product) {
     const description = String(product.generalDescription || "").trim();
+    const imageUrl = normalizePreviewUrl(product.generalImage?.url);
     const link = normalizePreviewUrl(product.generalLink);
-    if (!description && !link) return "";
+    if (!description && !imageUrl && !link) return "";
 
     return `
       <div class="product-general-info">
         <div class="product-surface-label">General information</div>
         ${description ? `<div class="product-description">${formatDescription(description)}</div>` : ""}
+        ${imageUrl ? renderImagePreviewShell(imageUrl) : ""}
         ${link ? renderOpenGraphPreviewShell(link) : ""}
       </div>
     `;
