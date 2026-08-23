@@ -12,9 +12,11 @@ test("loads the Strapi multiple-media gallery on SAV catalogue rows", () => {
   assert.match(app, /media\.formats\?\.thumbnail \|\| media\.formats\?\.small/);
 });
 
-test("only shows a compact gallery control when a product has images", () => {
+test("shows a thumbnail-led gallery control when a product has images", () => {
   assert.match(app, /if \(!count\) return "";/);
-  assert.match(app, /View photos \(\$\{count\}\)/);
+  assert.match(app, /class="product-gallery-trigger-media"/);
+  assert.match(app, /<strong>View gallery<\/strong>/);
+  assert.match(app, /class="product-gallery-trigger-count"/);
   assert.match(app, /data-product-gallery-open="true"/);
 });
 
@@ -33,4 +35,9 @@ test("opens guidance image previews in the controlled product gallery", () => {
   assert.match(app, /openProductGallery\(state\.selectedProduct, imagePreview\.dataset\.productImagePreview\)/);
   assert.match(app, /images\.findIndex\(\(image\) => normalizePreviewUrl\(image\.url\) === normalizedInitialUrl\)/);
   assert.doesNotMatch(app, /<a class="og-preview image-preview"[^>]+target="_blank"/);
+});
+
+test("the All class state includes blank or unrecognised product classes", () => {
+  assert.match(app, /classOptions\.every\(\(option\) => state\.classFilters\.has\(option\.id\)\)\) return true;/);
+  assert.match(app, /if \(!state\.classFilters\.size\) return false;/);
 });
