@@ -176,6 +176,7 @@
     limitFilters: new Set(),
     mountingSurfaceFilter: MOUNTING_SURFACE_ALL,
     selectedProduct: null,
+    galleryProduct: null,
     productSearchQuery: "",
     productSearchResults: [],
     productSearchSelection: null,
@@ -422,7 +423,9 @@
       const classFilter = button.dataset.classFilter;
       if (!getClassOption(classFilter, false)) return;
       if (classFilter === "all") {
-        state.classFilters = new Set(getSelectableClassOptions().map((option) => option.id));
+        const selectableClassIds = getSelectableClassOptions().map((option) => option.id);
+        const allSelected = selectableClassIds.every((id) => state.classFilters.has(id));
+        state.classFilters = allSelected ? new Set() : new Set(selectableClassIds);
       } else if (state.classFilters.has(classFilter)) {
         state.classFilters.delete(classFilter);
       } else {
@@ -481,12 +484,12 @@
 
       if (imagePreview) {
         event.preventDefault();
-        openProductGallery(state.selectedProduct, imagePreview.dataset.productImagePreview);
+        openProductGallery(state.galleryProduct, imagePreview.dataset.productImagePreview);
         return;
       }
 
       if (galleryTrigger) {
-        openProductGallery(state.selectedProduct);
+        openProductGallery(state.galleryProduct);
         return;
       }
 
@@ -1748,6 +1751,7 @@
     reconcileArtworkMappings(parsed.elements);
     const selectorState = getSelectorState();
     state.selectedProduct = selectorState.product;
+    state.galleryProduct = selectorState.product || selectorState.previewProduct;
     renderProductSearch();
     renderSelectorSurvey(selectorState);
     renderConfiguratorProgress(selectorState, parsed.elements);
