@@ -22,10 +22,6 @@
         <button class="ghost-button pricing-connection" id="pricing-connection" type="button" aria-haspopup="dialog">
           <span class="connection-dot"></span><span id="pricing-connection-label">Connect pricing</span>
         </button>
-        <button class="ghost-button" id="open-gsheet" type="button">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
-          Open GSheet
-        </button>
         <a class="ghost-button action-link" href="https://vivad.com.au/shopping-cart" target="savBuilderCart">
           <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6h15l-2 8H8L6 3H3M9 19a1 1 0 1 0 0 .01M18 19a1 1 0 1 0 0 .01"/></svg>
           Open Cart
@@ -53,8 +49,8 @@
         <div class="section-heading">
           <div class="heading-title">
             <h2 id="setup-title">Product Selector</h2>
-            <span class="help-tooltip" data-help="Use the Product Selector to choose the right SAV for your application. You can search by QCode, product name, mounting surface and laminate. Use the Mounting Surface, Brand, Class and Properties filters to assist with your product selection. The app will either tile or panel your job according to the size of the job and the stock width.">
-              <button class="help-button" type="button" aria-label="Product Selector help: Use the Product Selector to choose the right SAV for your application. You can search by QCode, product name, mounting surface and laminate. Use the Mounting Surface, Brand, Class and Properties filters to assist with your product selection. The app will either tile or panel your job according to the size of the job and the stock width.">?</button>
+            <span class="help-tooltip" data-help="Use the Product Selector to choose the right SAV for your application. You can search by QCode, product name, brand, mounting surface and laminate. Use the Mounting Surface, Brand, Class and Properties filters to assist with your product selection. The app will either tile or panel your job according to the size of the job and the stock width.">
+              <button class="help-button" type="button" aria-label="Product Selector help: Use the Product Selector to choose the right SAV for your application. You can search by QCode, product name, brand, mounting surface and laminate. Use the Mounting Surface, Brand, Class and Properties filters to assist with your product selection. The app will either tile or panel your job according to the size of the job and the stock width.">?</button>
             </span>
           </div>
         </div>
@@ -70,7 +66,7 @@
         <div class="product-search">
           <label class="field product-search-field">
             <span>Product search</span>
-            <input id="product-search" type="search" autocomplete="off" placeholder="Search product, mounting surface, laminate or QCode">
+            <input id="product-search" type="search" autocomplete="off" placeholder="Search product, brand, mounting surface, laminate or QCode">
           </label>
           <div id="product-search-results" class="product-search-results" aria-live="polite"></div>
         </div>
@@ -78,14 +74,14 @@
         <div class="filters-panel" aria-labelledby="filters-panel-title">
           <div id="filters-panel-title" class="filters-panel-title">Filters</div>
           <div class="filters-panel-body">
-            <div class="mounting-filter" aria-labelledby="mounting-filter-title">
-              <span id="mounting-filter-title">Mounting Surface</span>
-              <div id="mounting-surface-selector" class="mounting-surface-selector" aria-label="Mounting surface filter"></div>
-            </div>
-
             <div class="brand-filter" aria-labelledby="brand-filter-title">
               <span id="brand-filter-title">Brand</span>
               <div id="brand-selector" class="brand-selector" aria-label="Brand filter"></div>
+            </div>
+
+            <div class="mounting-filter" aria-labelledby="mounting-filter-title">
+              <span id="mounting-filter-title">Mounting Surface</span>
+              <div id="mounting-surface-selector" class="mounting-surface-selector" aria-label="Mounting surface filter"></div>
             </div>
 
             <div class="class-filter" aria-labelledby="class-filter-title">
@@ -261,6 +257,9 @@
             <thead>
               <tr>
                 <th>Width</th>
+                <th>QCode</th>
+                <th>Product QOH</th>
+                <th>Laminate QOH</th>
                 <th>Joins</th>
                 <th>Nested lm</th>
                 <th>Offset nested lm</th>
@@ -323,7 +322,7 @@
     <script src="pdfjs/pdf.classic.js"></script>
     <script src="pdfjs/pdf.worker.classic.js"></script>
     <script
-      src="app.js?v=apim-cart-20260823"
+      src="app.js?v=consolidated-20260823"
       data-apps-script-url="https://script.google.com/macros/s/AKfycbwN0Ocx_0jE9VD4nQLOAV9NaycPF9pRDe4Z3GmUTfLKWamcJjmz48MxdB7AQ6xlZrCu/exec"
       data-strapi-url="https://strapi.vivad.com.au"
       data-pricing-api-url="https://vivadpricing-app.calmtree-53cc02bb.australiasoutheast.azurecontainerapps.io"

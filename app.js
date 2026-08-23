@@ -34,30 +34,6 @@
   ).trim().replace(/\/+$/, "");
   const PDF_ICON_SRC = "assets/icons/pdf-file-icon.webp?v=1";
 
-  const TILE_OFFSET_MM = 5;
-  const MATERIAL_LOADING_MM = 500;
-  const SETUP_FEE = 22;
-  const TRIM_PER_LINEAR_M = 0.5;
-  const STOCK_MULTIPLIER = 2;
-  const LAMINATE_MULTIPLIER = 3;
-  const PRINT_PER_SQM = 15;
-  const UNIT_PRICE = 0.5;
-  const MAX_PREVIEW_PLACEMENTS = 2600;
-  const DEFAULT_PRICING_CONFIG = Object.freeze({
-    materialLoadingMm: MATERIAL_LOADING_MM,
-    edgePrintMarginMm: 0,
-    setupFee: SETUP_FEE,
-    trimPerLinearM: TRIM_PER_LINEAR_M,
-    stockMultiplier: STOCK_MULTIPLIER,
-    laminateMultiplier: LAMINATE_MULTIPLIER,
-    printPerSqm: PRINT_PER_SQM,
-    unitPrice: UNIT_PRICE,
-    printModes: {
-      clear: [],
-      translucent: [],
-      standard: []
-    }
-  });
   const BRAND_COLUMN = "Brand";
   const FALLBACK_BRAND_OPTIONS = [
     { id: "all", label: "All", matches: [] },
@@ -70,7 +46,6 @@
   const CLASS_OPTIONS = [
     { id: "all", label: "All", matches: [] },
     { id: "monomeric", label: "Monomeric (Good)", matches: ["Monomeric", "Mono"] },
-    { id: "polymeric", label: "Polymeric (Better)", matches: ["Polymeric", "Poly"] },
     { id: "intermediate-polymeric", label: "Intermediate Polymeric (Better)", matches: ["Intermediate Polymeric"], matchMode: "prefix" },
     { id: "premium-polymeric", label: "Premium Polymeric (Better still)", matches: ["Premium Polymeric"], matchMode: "prefix" },
     { id: "cast", label: "Cast (Best)", matches: ["Cast"] }
@@ -85,7 +60,10 @@
     { id: "translucent", label: "Translucent", columns: ["Translucent"] },
     { id: "clear", label: "Clear", columns: ["Clear"] },
     { id: "optically-clear", label: "Optically Clear", columns: ["Optically Clear"] },
-    { id: "perforated", label: "Perforated (One Way Vision)", columns: ["Perforated", "Perforated (One way Vision)", "Perforated (One Way Vision)"] }
+    { id: "perforated", label: "Perforated (One Way Vision)", columns: ["Perforated", "Perforated (One way Vision)", "Perforated (One Way Vision)"] },
+    { id: "reflective", label: "Reflective", columns: ["Reflective"] },
+    { id: "specialty", label: "Specialty", columns: ["Specialty"] },
+    { id: "black-back", label: "Black back", columns: ["Black back", "Black Back", "Blackback"] }
   ];
   const MOUNTING_SURFACE_ALL = "all";
   const MOUNTING_SURFACE_COLUMN = "Mounting Surface";
@@ -93,7 +71,11 @@
   const TYPE_COLUMN = "Type";
   const LONGEVITY_COLUMN = "Longevity";
   const LAMINATE_COLUMN = "Laminate";
+  const NO_LAMINATE_VALUE = "__no_laminate__";
+  const NO_LAMINATE_LABEL = "No laminate";
   const PRINT_MODE_COLUMN = "Print Mode";
+  const GENERAL_DESCRIPTION_COLUMN = "General Description";
+  const GENERAL_LINK_COLUMN = "General Link";
   const SURFACE_DESCRIPTION_COLUMN = "Surface Description";
   const SURFACE_LINK_COLUMN = "Surface Link";
   const PRODUCT_SPEC_SHEET_COLUMNS = [
@@ -132,6 +114,20 @@
   const APPS_SCRIPT_RETRY_DELAY_MS = 700;
   const STRAPI_REQUEST_TIMEOUT_MS = 15000;
   const STRAPI_PAGE_SIZE = 200;
+  const STRAPI_PRINT_MODE_FIELDS = Object.freeze([
+    ["cmyk", "CMYK"],
+    ["cmykReverse", "CMYK Reverse"],
+    ["spotWhite", "Spot White"],
+    ["spotWhiteReversed", "Spot White Reversed"],
+    ["cmykSpotWhite", "CMYK + Spot White"],
+    ["cmykSpotWhiteReversed", "CMYK + Spot White Reversed"],
+    ["dayNight3Layers", "Day/Night (3 Layers)"],
+    ["dayNight3LayersReversed", "Day/Night (3 Layers) Reversed"],
+    ["whiteUnderfloodCmykRightReading", "White Underflood + CMYK (Right Reading)"],
+    ["cmykReversedWhiteOverflood", "CMYK (Reversed) + White Overflood"],
+    ["fiveLayerDoubleSided", "5 Layer Double Sided"],
+    ["doubleStrike", "Double Strike"]
+  ]);
   const SURFACE_LABELS = Object.freeze({
     "glass": "Glass",
     "painted-plaster-prepared": "Painted Plaster Prepared",
@@ -149,38 +145,6 @@
     "acrylic": "Acrylic",
     "polyethylene": "Polyethylene (Wheely Bins, plastic Seating)"
   });
-
-  const FALLBACK_SELECTOR_CSV = [
-    '"Surface","Mounting Surface","Type","Laminate","Longevity","Product","Width1","Cost1","Width2","Cost2","Print SQM Rate"',
-    '"Glass","Internal","Perforated 20% with Flood White","FALSE","FALSE","Innova Clear 1370 ","1370","$16.46","","","25"',
-    '"Glass","Internal","Perforated 20% with Flood White Plus Black","FALSE","FALSE","Innova Clear 1370 ","1370","$16.46","","","30"',
-    '"Glass","Internal","Clear Reverse Print  with Full Flood White","FALSE","Short term/ Promotional","MPI 3041","1370","5.44","1520","6.04","25"',
-    '"Glass","Internal","Clear Reverse Print  with Full Flood White","FALSE","5 Years","Orajet 3651 Poly Clear ","1370","$7.69","1600","8.98","25"',
-    '"Glass","Internal","Clear Reverse Print  with Full Flood White","FALSE","7 Years","Orafol 3952F","1370","$24.37","1520","27.03","25"',
-    '"Glass","Internal","Clear Reverse Print Day/Night","FALSE","Short term/ Promotional","MPI 3041","1370","5.44","1520","6.04","25"',
-    '"Glass","Internal","Clear Reverse Print Day/Night","FALSE","5 Years","Orajet 3651 Poly Clear ","1370","$7.69","1600","8.98","25"',
-    '"Glass","Internal","Clear Reverse Print Day/Night","FALSE","7 Years","Orafol 3952F","1370","$24.37","1520","27.03","25"',
-    '"Glass","Internal","Clear 5 Layer Double sided","FALSE","Short term/ Promotional","MPI 3041","1370","5.44","1520","6.04","25"',
-    '"Glass","Internal","Clear 5 Layer Double sided","FALSE","5 Years","Orajet 3651 Poly Clear ","1370","$7.69","1600","8.98","25"',
-    '"Glass","Internal","Clear 5 Layer Double sided","FALSE","7 Years","Orafol 3952F","1370","$24.37","1520","27.03","25"',
-    '"Glass","External","Perforated","","12-18 Months","Megaview 20%","1370","$10.70","","","15"',
-    '"Glass","External","Perforated","","2-3 Years","Innova 30% No Laminate","1370","19.1","","","15"',
-    '"Glass","External","Perforated","","3-5 Years","Innova 30% With Laminate","1370","28.5","","","15"',
-    '"Glass","External","Perforated","","5 Years Plus","Panoramawith laminate","1370","32.04","","","15"',
-    '"Glass","External","Perforated","","12-18 Months","Magaview 40%","1370","$10.70","","","15"',
-    '"Painted Plaster Prepared for SAV","","","","","","","","","",""',
-    '"Acrylic","","","","","","","","","",""',
-    '"ACM, Colourbond Smooth ","","","","","","","","","",""',
-    '"Timber Floor","","","","","","","","","",""',
-    '"Smooth Concrete","","","","","","","","","",""',
-    '"Brick or Stone","","","","","","","","","",""',
-    '"Carpet","","","","","","","","","",""',
-    '"Ashphalt","","","","","","","","","",""',
-    '"Raw Gyprock Plaster","","","","","","","","","",""',
-    '"Raw MDF","","","","","","","","","",""',
-    '"Rough Timber Hoarding","","","","","","","","","",""',
-    '"Polythene eg Wheely Bin, Plastic seats","","","","","","","","","",""'
-  ].join("\n");
 
   const SAMPLE_JOB = [
     "Shortname, Quantity, Width, Height",
@@ -206,10 +170,9 @@
     selectorColumns: [],
     postProductSelectorColumns: [],
     selectorSelections: {},
-    pricingConfig: { ...DEFAULT_PRICING_CONFIG },
     brandFilter: "all",
     brandOptions: FALLBACK_BRAND_OPTIONS.map((option) => ({ ...option })),
-    classFilter: "all",
+    classFilters: new Set(CLASS_OPTIONS.slice(1).map((option) => option.id)),
     limitFilters: new Set(),
     mountingSurfaceFilter: MOUNTING_SURFACE_ALL,
     selectedProduct: null,
@@ -217,7 +180,7 @@
     productSearchResults: [],
     productSearchSelection: null,
     elementInputMode: "table",
-    productSource: "fallback",
+    productSource: "strapi",
     useOffsetJoins: null,
     offsetPromptDismissed: false,
     artworks: [],
@@ -253,7 +216,7 @@
   function init() {
     cacheUi();
     applyAppMode();
-    applySelectorData(parseSelectorCsv(FALLBACK_SELECTOR_CSV), "fallback");
+    applySelectorData({ rows: [], selectorColumns: [], postProductSelectorColumns: [LAMINATE_COLUMN] }, "strapi");
     ui.jobInput.value = "";
     renderElementTableFromText();
     renderBrandSelector();
@@ -284,9 +247,7 @@
     ui.productSearchResults = document.getElementById("product-search-results");
     ui.sheetStatus = document.getElementById("sheet-status");
     ui.appToast = document.getElementById("app-toast");
-    ui.openGSheet = document.getElementById("open-gsheet");
     ui.refreshProducts = document.getElementById("refresh-products");
-    ui.printRateConstant = document.getElementById("print-rate-constant");
     ui.downloadImposition = document.getElementById("download-imposition");
     ui.emailImposition = document.getElementById("email-imposition");
     ui.bleedMm = document.getElementById("bleed-mm");
@@ -339,7 +300,6 @@
     document.documentElement.style.setProperty("--paper", APP_CONFIG.background);
     document.body.dataset.appMode = APP_MODE;
     if (ui.appTitle) ui.appTitle.textContent = APP_CONFIG.title;
-    if (ui.openGSheet) ui.openGSheet.hidden = APP_MODE === "live";
     if (ui.refreshProducts) ui.refreshProducts.hidden = APP_MODE === "live";
   }
 
@@ -419,8 +379,14 @@
       const button = event.target.closest("[data-class-filter]");
       if (!button) return;
       const classFilter = button.dataset.classFilter;
-      if (!getClassOption(classFilter) || state.classFilter === classFilter) return;
-      state.classFilter = classFilter;
+      if (!getClassOption(classFilter, false)) return;
+      if (classFilter === "all") {
+        state.classFilters = new Set(getSelectableClassOptions().map((option) => option.id));
+      } else if (state.classFilters.has(classFilter)) {
+        state.classFilters.delete(classFilter);
+      } else {
+        state.classFilters.add(classFilter);
+      }
       state.productSearchSelection = null;
       state.productSearchQuery = "";
       ui.productSearch.value = "";
@@ -463,12 +429,11 @@
       recalculate();
     });
 
-    ui.openGSheet.addEventListener("click", openGSheetWithPassword);
-
     ui.selectorSurvey.addEventListener("click", (event) => {
       const choice = event.target.closest("[data-selector-column]");
       const reset = event.target.closest("[data-selector-reset]");
       const back = event.target.closest("[data-selector-back]");
+      const changeProduct = event.target.closest("[data-selector-change-product]");
       const clearFilters = event.target.closest("[data-selector-clear-filters]");
 
       if (reset) {
@@ -478,6 +443,13 @@
 
       if (clearFilters) {
         clearSelectorFilters();
+        return;
+      }
+
+      if (changeProduct) {
+        state.productSearchSelection = null;
+        clearSelectionFromColumn("Product");
+        recalculate();
         return;
       }
 
@@ -669,7 +641,7 @@
   function resetSurveyAndFilters() {
     state.selectorSelections = {};
     state.brandFilter = "all";
-    state.classFilter = "all";
+    state.classFilters = new Set(getSelectableClassOptions().map((option) => option.id));
     state.limitFilters.clear();
     state.mountingSurfaceFilter = MOUNTING_SURFACE_ALL;
     state.productSearchSelection = null;
@@ -684,7 +656,7 @@
 
   function clearSelectorFilters() {
     state.brandFilter = "all";
-    state.classFilter = "all";
+    state.classFilters = new Set(getSelectableClassOptions().map((option) => option.id));
     state.limitFilters.clear();
     state.mountingSurfaceFilter = MOUNTING_SURFACE_ALL;
     state.productSearchSelection = null;
@@ -955,27 +927,6 @@
   function scheduleRecalculate() {
     window.clearTimeout(recalcTimer);
     recalcTimer = window.setTimeout(recalculate, 130);
-  }
-
-  async function openGSheetWithPassword() {
-    if (!isAppsScriptConfigured()) {
-      showAppToast("Apps Script is not configured yet.", "error");
-      return;
-    }
-
-    const password = window.prompt("Enter password to open the GSheet");
-    if (password == null) return;
-
-    try {
-      const payload = await loadAppsScriptPayload({
-        action: "openSheet",
-        password: password.trim()
-      });
-      if (!payload.url) throw new Error("No sheet URL was returned.");
-      window.open(payload.url, "_blank", "noopener");
-    } catch (error) {
-      showAppToast(error.message || "Could not open the GSheet.", "error");
-    }
   }
 
   function setElementInputMode(mode) {
@@ -1277,9 +1228,7 @@
     setSheetStatus("loading", "Loading SAV catalogue...");
 
     const strapiConfigured = isStrapiConfigured();
-    const [configResult, selectorResult, strapiResult, brandResult] = await Promise.allSettled([
-      loadConfigFromAppsScript(),
-      loadSelectorFromAppsScript(),
+    const [strapiResult, brandResult] = await Promise.allSettled([
       strapiConfigured ? loadSavCatalogFromStrapi() : Promise.resolve(null),
       strapiConfigured ? loadBrandsFromStrapi() : Promise.resolve(null)
     ]);
@@ -1292,60 +1241,17 @@
       renderBrandSelector();
     }
 
-    state.pricingConfig = configResult.status === "fulfilled"
-      ? { ...DEFAULT_PRICING_CONFIG, ...configResult.value }
-      : { ...DEFAULT_PRICING_CONFIG };
-
-    if (selectorResult.status === "fulfilled" && selectorResult.value.rows.length) {
-      let selectorData = selectorResult.value;
-
-      if (strapiConfigured) {
-        if (strapiResult.status === "rejected") {
-          applySelectorData({ ...selectorData, rows: [] }, "strapi-error");
-          setSheetStatus("error", "Could not load the published Strapi catalogue. Product selection is unavailable.", { retry: true });
-          recalculate();
-          return;
-        }
-
-        selectorData = await mergeStrapiCatalog(selectorData, strapiResult.value);
-        if (!selectorData.rows.length) {
-          applySelectorData(selectorData, "strapi");
-          setSheetStatus("warning", "Strapi has no published SAV configurations matching the pricing feed.", { retry: true });
-          recalculate();
-          return;
-        }
-      }
-
-      applySelectorData(selectorData, strapiConfigured ? "strapi+apps-script" : "apps-script");
-      if (configResult.status === "rejected") {
-        setSheetStatus("warning", "Product data loaded, but Config could not be loaded. Default pricing settings are being used.", { retry: true });
-      } else {
-        setSheetStatus("", "");
-      }
-    } else {
-      const error = selectorResult.status === "rejected"
-        ? selectorResult.reason
-        : new Error("No selector rows in sheet");
-      applySelectorData(parseSelectorCsv(FALLBACK_SELECTOR_CSV), "fallback");
-      setSheetStatus("error", getSelectorLoadFailureMessage(error), { retry: true });
+    if (!strapiConfigured || strapiResult.status === "rejected") {
+      applySelectorData({ rows: [], selectorColumns: [], postProductSelectorColumns: [LAMINATE_COLUMN] }, "strapi-error");
+      setSheetStatus("error", "Could not load the published Strapi catalogue. Product selection is unavailable.", { retry: true });
+      recalculate();
+      return;
     }
 
+    const selectorData = buildSelectorDataFromStrapi(strapiResult.value || []);
+    applySelectorData(selectorData, "strapi");
+    setSheetStatus(selectorData.rows.length ? "" : "warning", selectorData.rows.length ? "" : "Strapi has no published SAV configurations with QCodes.", { retry: true });
     recalculate();
-  }
-
-  async function refreshPricingConfig() {
-    state.pricingConfig = { ...DEFAULT_PRICING_CONFIG };
-    if (!isAppsScriptConfigured()) return;
-
-    try {
-      const config = await loadConfigFromAppsScript();
-      state.pricingConfig = {
-        ...DEFAULT_PRICING_CONFIG,
-        ...config
-      };
-    } catch (error) {
-      state.pricingConfig = { ...DEFAULT_PRICING_CONFIG };
-    }
   }
 
   function isAppsScriptConfigured() {
@@ -1358,7 +1264,7 @@
 
   async function loadSavCatalogFromStrapi() {
     const url = new URL("/api/sav-builder-options", STRAPI_BASE_URL);
-    url.searchParams.set("pagination[pageSize]", String(STRAPI_PAGE_SIZE));
+    url.searchParams.set("pagination[pageSize]", String(Math.min(100, STRAPI_PAGE_SIZE)));
     url.searchParams.set("sort", "sortOrder:asc");
     url.searchParams.set("populate", "*");
 
@@ -1366,17 +1272,26 @@
     const timeout = window.setTimeout(() => controller?.abort(), STRAPI_REQUEST_TIMEOUT_MS);
 
     try {
-      const response = await fetch(url.toString(), {
-        method: "GET",
-        mode: "cors",
-        cache: "no-store",
-        signal: controller?.signal
-      });
-      if (!response.ok) throw new Error(`Strapi catalogue returned HTTP ${response.status}.`);
+      const entries = [];
+      let page = 1;
+      let pageCount = 1;
+      do {
+        url.searchParams.set("pagination[page]", String(page));
+        const response = await fetch(url.toString(), {
+          method: "GET",
+          mode: "cors",
+          cache: "no-store",
+          signal: controller?.signal
+        });
+        if (!response.ok) throw new Error(`Strapi catalogue returned HTTP ${response.status}.`);
 
-      const payload = await response.json();
-      if (!Array.isArray(payload?.data)) throw new Error("Strapi catalogue response has no data array.");
-      return payload.data.map((entry) => entry?.attributes ? { ...entry.attributes, documentId: entry.documentId || entry.id } : entry);
+        const payload = await response.json();
+        if (!Array.isArray(payload?.data)) throw new Error("Strapi catalogue response has no data array.");
+        entries.push(...payload.data);
+        pageCount = Math.max(1, Number(payload?.meta?.pagination?.pageCount) || 1);
+        page += 1;
+      } while (page <= pageCount);
+      return entries.map((entry) => entry?.attributes ? { ...entry.attributes, documentId: entry.documentId || entry.id } : entry);
     } catch (error) {
       if (error?.name === "AbortError") throw new Error("Strapi catalogue request timed out.");
       throw error;
@@ -1385,35 +1300,32 @@
     }
   }
 
-  async function mergeStrapiCatalog(selectorData, catalogEntries) {
-    const catalogBySourceKey = new Map(
-      catalogEntries
-        .filter((entry) => entry?.sourceKey)
-        .map((entry) => [String(entry.sourceKey), entry])
-    );
-
-    const mergedRows = [];
-    for (const row of selectorData.rows) {
-      const sourceKey = await buildSavSourceKey(row);
-      const entry = catalogBySourceKey.get(sourceKey);
-      if (!entry) continue;
-
-      const merged = mergeStrapiEntryIntoSelectorRow(row, entry);
-      if (merged) mergedRows.push(merged);
-    }
-
-    return { ...selectorData, rows: mergedRows };
+  function buildSelectorDataFromStrapi(catalogEntries) {
+    const rows = catalogEntries.flatMap((entry) => {
+      const rollOptions = (Array.isArray(entry?.rollOptions) ? entry.rollOptions : [])
+        .map((roll) => ({
+          width: Number(roll?.widthMm),
+          qcode: String(roll?.qcode || "").trim(),
+          jtCodeProduct: "",
+          jtCodeLaminate: "",
+          qohProduct: null,
+          qohLaminate: null
+        }))
+        .filter((roll) => Number.isFinite(roll.width) && roll.width > 0 && roll.qcode);
+      if (!entry?.productName || !rollOptions.length) return [];
+      const guidance = Array.isArray(entry.surfaceGuidance) && entry.surfaceGuidance.length
+        ? entry.surfaceGuidance
+        : [{ surface: "", description: "", link: "" }];
+      return guidance.map((surfaceInfo) => buildSelectorRowFromStrapi(entry, surfaceInfo, rollOptions));
+    });
+    return {
+      rows,
+      selectorColumns: [],
+      postProductSelectorColumns: [LAMINATE_COLUMN]
+    };
   }
 
-  function mergeStrapiEntryIntoSelectorRow(row, entry) {
-    const surfaceGuidance = Array.isArray(entry.surfaceGuidance) ? entry.surfaceGuidance : [];
-    const rowSurfaceKey = normalizeKey(row[MOUNTING_SURFACE_COLUMN]);
-    const surfaceInfo = surfaceGuidance.find((guidance) =>
-      normalizeKey(SURFACE_LABELS[guidance.surface] || guidance.surface) === rowSurfaceKey
-    );
-
-    if (rowSurfaceKey && !surfaceInfo) return null;
-
+  function buildSelectorRowFromStrapi(entry, surfaceInfo, rolls) {
     const productSpecSheet = getStrapiMediaUrl(
       entry.productSpecSheet,
       entry.produstSpecSheet,
@@ -1423,16 +1335,20 @@
       entry.laminateSpecSheet,
       entry.laminateSpecSheetUrl
     );
+    const surface = SURFACE_LABELS[surfaceInfo?.surface] || String(surfaceInfo?.surface || "").trim();
 
     return {
-      ...row,
-      Product: String(entry.productName || row.Product || "").trim(),
+      Product: String(entry.productName || "").trim(),
       Brand: String(entry.brand || "").trim(),
       Class: String(entry.materialClass || "").trim(),
       Longevity: String(entry.longevity || "").trim(),
       Laminate: String(entry.laminateName || "").trim(),
+      [MOUNTING_SURFACE_COLUMN]: surface,
+      [LEGACY_SURFACE_COLUMN]: surface,
       "Product Spec Sheet": productSpecSheet,
       "Laminate Spec Sheet": laminateSpecSheet,
+      [GENERAL_DESCRIPTION_COLUMN]: String(entry.generalDescription || "").trim(),
+      [GENERAL_LINK_COLUMN]: String(entry.generalLink || "").trim(),
       "Surface Description": String(surfaceInfo?.description || "").trim(),
       "Surface Link": String(surfaceInfo?.link || "").trim(),
       White: toSelectorBoolean(entry.white),
@@ -1445,8 +1361,13 @@
       Clear: toSelectorBoolean(entry.clear),
       "Optically Clear": toSelectorBoolean(entry.opticallyClear),
       "Perforated (One way Vision)": toSelectorBoolean(entry.perforated),
+      Reflective: toSelectorBoolean(entry.reflective),
+      Specialty: toSelectorBoolean(entry.specialty),
+      "Black back": toSelectorBoolean(entry.blackBack),
       savDocumentId: entry.documentId || "",
-      savSourceKey: entry.sourceKey
+      availablePrintModes: entry.availablePrintModes || {},
+      rolls,
+      isCompleteProduct: true
     };
   }
 
@@ -1544,24 +1465,6 @@
     return value === true ? "TRUE" : "";
   }
 
-  async function buildSavSourceKey(row) {
-    const productName = String(row.Product || "").trim();
-    const laminateName = String(row.Laminate || "").trim() || undefined;
-    const rolls = (Array.isArray(row.rolls) ? row.rolls : [])
-      .filter((roll) => Number.isInteger(roll.width) && roll.width > 0 && roll.qcode)
-      .map((roll) => ({ widthMm: roll.width, qcode: String(roll.qcode).trim() }))
-      .sort((left, right) => left.widthMm - right.widthMm);
-    const identity = JSON.stringify({ productName, laminateName, rolls });
-    const digest = await sha256Hex(identity);
-    return `${savSlugify(productName, 120) || "sav-option"}-${digest.slice(0, 16)}`;
-  }
-
-  async function sha256Hex(value) {
-    const bytes = new TextEncoder().encode(value);
-    const digest = await window.crypto.subtle.digest("SHA-256", bytes);
-    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-  }
-
   function savSlugify(value, maxLength) {
     return String(value || "")
       .normalize("NFKD")
@@ -1570,16 +1473,6 @@
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, maxLength);
-  }
-
-  async function loadConfigFromAppsScript() {
-    const payload = await loadAppsScriptPayload({ sheet: "Config" });
-    return parseConfigRows(getAppsScriptRows(payload));
-  }
-
-  async function loadSelectorFromAppsScript() {
-    const payload = await loadAppsScriptPayload({ sheet: "Selector" });
-    return parseSelectorRows(getAppsScriptRows(payload));
   }
 
   function getAppsScriptRows(payload) {
@@ -1696,11 +1589,6 @@
     }
   }
 
-  function getSelectorLoadFailureMessage(error) {
-    const detail = APP_MODE === "dev" && error?.message ? ` ${error.message}` : "";
-    return `Could not load the live GSheet data.${detail} Using emergency fallback data.`;
-  }
-
   function setSheetStatus(variant, message, options = {}) {
     if (!ui.sheetStatus) return;
 
@@ -1803,16 +1691,11 @@
     }
 
     const settings = getSettings();
-    const options = product.rolls.map((roll) => evaluateRoll(product, roll, parsed.elements, settings));
-    const ranked = options.slice().sort(compareRollOptions);
-    const best = ranked[0];
-
-    state.currentOptions = ranked;
-    state.currentBest = best;
-
     renderArtworkList(parsed.elements);
-    renderResults(best, ranked, parsed.elements);
-    renderConfiguratorGuidance(selectorState, parsed.elements, best);
+    state.currentOptions = [];
+    state.currentBest = null;
+    renderAuthoritativeQuotePending();
+    renderConfiguratorGuidance(selectorState, parsed.elements, null);
     requestAuthoritativeQuote(product, parsed.elements, settings);
   }
 
@@ -1880,6 +1763,7 @@
       state.authoritativeQuoteReady = false;
       syncCartButtons();
       renderPricingConnection();
+      renderAuthoritativeQuoteUnavailable("Connect to the Pricing Engine to calculate the stock width and price.");
       return;
     }
     const requestPayload = buildSavQuoteRequest(product, elements, settings);
@@ -1902,20 +1786,23 @@
         return;
       }
       if (!response.ok) throw new Error(quote.error || "Authoritative pricing failed.");
-      applyAuthoritativeQuote(quote, elements);
+      applyAuthoritativeQuote(quote, product, elements);
       renderPricingConnection();
     } catch (error) {
       if (requestId !== state.pricingQuoteRequestId) return;
       renderPricingConnection();
-      showAppToast(`${error?.message || "Authoritative pricing failed."} Showing the local estimate.`, "error");
+      renderAuthoritativeQuoteUnavailable(error?.message || "Authoritative pricing failed.");
+      showAppToast(error?.message || "Authoritative pricing failed.", "error");
     }
   }
 
   function buildSavQuoteRequest(product, elements, settings) {
     return {
-      qcodes: product.rolls.map((roll) => roll.qcode).filter(Boolean),
+      stockOptions: product.rolls
+        .filter((roll) => roll.qcode)
+        .map((roll) => ({ widthMm: roll.width, qcode: roll.qcode })),
       printMode: product.printMode || "",
-      settings,
+      advancedOptions: settings,
       elements: elements.map((element) => ({
         shortname: element.shortname,
         quantity: element.quantity,
@@ -1925,21 +1812,36 @@
     };
   }
 
-  function applyAuthoritativeQuote(quote, elements) {
+  function applyAuthoritativeQuote(quote, product, elements) {
     const qcode = String(quote?.source?.qcode || "").trim();
-    const localBest = state.currentOptions.find((option) => String(option.roll.qcode || "").trim() === qcode);
-    if (!localBest || !quote.imposition || !quote.costs) return;
-    const alternatives = new Map((quote.alternatives || []).map((option) => [String(option.qcode || "").trim(), option]));
-    const ranked = state.currentOptions.map((option) => {
-      const authoritative = alternatives.get(String(option.roll.qcode || "").trim());
-      return authoritative ? { ...option, costs: { ...option.costs, total: authoritative.total }, selectedPack: { ...option.selectedPack, lengthMm: authoritative.printLengthMm }, joins: authoritative.joins } : option;
-    }).sort(compareRollOptions);
-    const evenPack = quote.imposition.evenPack || localBest.evenPack;
-    const offsetPack = quote.imposition.offsetPack || localBest.offsetPack;
+    if (!qcode || !quote.imposition || !quote.costs || !Array.isArray(quote.lines)) return;
+    const localRolls = new Map(product.rolls.map((roll) => [String(roll.qcode || "").trim(), roll]));
+    const ranked = (quote.alternatives || []).map((option) => {
+      const roll = localRolls.get(String(option.qcode || "").trim()) || {};
+      const evenPack = option.evenPack || { strategy: "nested", lengthMm: option.printLengthMm, placements: [] };
+      const offsetPack = option.offsetPack || evenPack;
+      return {
+        productName: product.name,
+        printMode: product.printMode,
+        roll: { ...roll, width: option.rollWidthMm, printableWidth: option.printableWidthMm, ...applyAuthoritativeStockInventory(roll, option) },
+        joins: option.joins,
+        evenPack,
+        offsetPack,
+        selectedPack: option.offsetJoinsUsed ? offsetPack : evenPack,
+        offsetSaves: option.offsetSaves === true,
+        offsetJoinsUsed: option.offsetJoinsUsed === true,
+        costs: { total: option.total }
+      };
+    });
+    const localBestRoll = localRolls.get(qcode) || {};
+    const evenPack = quote.imposition.evenPack;
+    const offsetPack = quote.imposition.offsetPack;
     const selectedPack = quote.imposition.offsetJoinsUsed ? offsetPack : evenPack;
     const best = {
-      ...localBest,
+      productName: product.name,
+      printMode: product.printMode,
       costs: quote.costs,
+      lines: quote.lines,
       joins: quote.imposition.joins,
       offsetSaves: quote.imposition.offsetSaves,
       offsetJoinsUsed: quote.imposition.offsetJoinsUsed,
@@ -1947,13 +1849,49 @@
       evenPack,
       offsetPack,
       selectedPack: { ...selectedPack, placements: quote.imposition.placements, truncated: quote.imposition.placementsTruncated, lengthMm: quote.imposition.printLengthMm },
-      roll: { ...localBest.roll, printableWidth: quote.imposition.printableWidthMm }
+      maxUnrotatedPrintWidth: elements.reduce((maximum, element) => Math.max(maximum, element.width), 0),
+      roll: {
+        ...localBestRoll,
+        width: quote.selection?.rollWidthMm,
+        ...applyAuthoritativeStockInventory(localBestRoll, quote.source),
+        printableWidth: quote.imposition.printableWidthMm
+      }
     };
     state.currentBest = best;
     state.currentOptions = ranked;
     state.authoritativeQuoteReady = true;
     renderResults(best, ranked, elements);
-    showAppToast("Price verified by the Vivad Pricing Service.");
+  }
+
+  function renderAuthoritativeQuotePending() {
+    renderEmptyResults();
+    if (ui.rollChoice) ui.rollChoice.textContent = state.pricingApiToken ? "Pricing…" : "Connect pricing";
+    ui.priceSummary.textContent = state.pricingApiToken ? "The Pricing Engine is selecting the stock width and calculating the quote." : "";
+  }
+
+  function renderAuthoritativeQuoteUnavailable(message) {
+    state.currentBest = null;
+    state.currentOptions = [];
+    renderEmptyResults();
+    if (ui.rollChoice) ui.rollChoice.textContent = "Price unavailable";
+    ui.priceSummary.textContent = String(message || "Pricing is unavailable.");
+  }
+
+  function applyAuthoritativeStockInventory(roll, inventory) {
+    return {
+      ...roll,
+      jtCodeProduct: String(inventory?.jtCodeProduct || "").trim(),
+      jtCodeLaminate: String(inventory?.jtCodeLaminate || "").trim(),
+      qohProduct: normalizeQoh(inventory?.qohProduct),
+      qohLaminate: normalizeQoh(inventory?.qohLaminate),
+      inventorySource: String(inventory?.inventorySource || "").trim()
+    };
+  }
+
+  function normalizeQoh(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
   }
 
   function getSettings() {
@@ -1974,6 +1912,9 @@
     const candidates = getCandidateSelectorRows(selections);
     const question = getNextSelectorQuestion(candidates, selections);
     const product = question ? null : buildSelectedProduct(candidates, selections);
+    const previewProduct = question && selections.Product
+      ? buildSelectedProduct(candidates, selections)
+      : null;
     const pathEntries = getSelectorPathEntries(selections, candidates, question);
 
     return {
@@ -1982,6 +1923,7 @@
       candidates,
       question,
       product,
+      previewProduct,
       hasRows: state.selectorRows.length > 0,
       completeProductCount: candidates.filter((row) => row.isCompleteProduct).length
     };
@@ -2003,13 +1945,14 @@
 
     const selections = { ...selection.selections };
     const productName = selection.productName || selections.Product || rows[0].Product;
-    const question = getPrintModeQuestion(rows, selections);
+    const candidates = filterSelectorRowsBySelections(rows, selections);
+    const question = getNextProductOptionQuestion(candidates, selections);
     if (question) {
-      const previewProduct = buildProductFromRows(rows, productName, selections);
+      const previewProduct = buildProductFromRows(candidates, productName, selections);
       return {
         selections,
-        pathEntries: getSelectorPathEntries(selections, rows, question),
-        candidates: rows,
+        pathEntries: getSelectorPathEntries(selections, candidates, question),
+        candidates,
         question,
         product: null,
         previewProduct,
@@ -2018,13 +1961,13 @@
       };
     }
 
-    const product = buildProductFromRows(rows, productName, selections);
+    const product = buildProductFromRows(candidates, productName, selections);
     if (!product) return null;
 
     return {
       selections,
       pathEntries: getProductSearchPathEntries(product),
-      candidates: rows,
+      candidates,
       question: null,
       product,
       hasRows: state.selectorRows.length > 0,
@@ -2113,6 +2056,7 @@
     const mountingSurface = row[MOUNTING_SURFACE_COLUMN];
     const values = [
       row.Product,
+      row[BRAND_COLUMN],
       mountingSurface,
       getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, mountingSurface),
       row.Laminate,
@@ -2143,11 +2087,12 @@
     const terms = getProductSearchTerms(query);
     if (!normalizedQuery && !terms.length) return "";
 
-    return getAvailableMountingSurfaceChoices().find((choice) =>
+    const matches = getAvailableMountingSurfaceChoices().filter((choice) =>
       getMountingSurfaceSearchLabels(choice).some((label) =>
         matchesMountingSurfaceSearchLabel(label, normalizedQuery, terms)
       )
-    ) || "";
+    );
+    return matches.length === 1 ? matches[0] : "";
   }
 
   function getMountingSurfaceSearchLabels(choice) {
@@ -2168,11 +2113,10 @@
   function matchesMountingSurfaceSearchLabel(label, normalizedQuery, terms) {
     const labelKey = normalizeKey(label);
     if (!labelKey) return false;
-    if (normalizedQuery && (labelKey === normalizedQuery || (normalizedQuery.length >= 3 && labelKey.includes(normalizedQuery)))) {
-      return true;
-    }
+    if (normalizedQuery && labelKey === normalizedQuery) return true;
+    const labelTerms = getProductSearchTerms(label);
     return terms.some((term) =>
-      term.length >= 3 && (labelKey === term || labelKey.includes(term))
+      term.length >= 3 && labelTerms.includes(term)
     );
   }
 
@@ -2257,17 +2201,21 @@
   }
 
   function getCommonSelectorValue(rows, column) {
-    const values = Array.from(new Set(rows
-      .map((row) => String(row[column] || "").trim())
-      .filter(isMeaningfulSelectorValue)));
+    const values = getDistinctValues(rows, column).filter(isMeaningfulSelectorValue);
     return values.length === 1 ? values[0] : "";
   }
 
   function getCandidateSelectorRows(selections) {
-    return state.selectorRows.filter((row) =>
-      matchesSelectedFilters(row) &&
+    return filterSelectorRowsBySelections(
+      state.selectorRows.filter(matchesSelectedFilters),
+      selections
+    );
+  }
+
+  function filterSelectorRowsBySelections(rows, selections) {
+    return rows.filter((row) =>
       Object.entries(selections).every(([column, value]) =>
-        isSyntheticSelectorColumn(column) || !value || String(row[column] || "") === value
+        isSyntheticSelectorColumn(column) || !value || selectorRowMatchesValue(row, column, value)
       )
     );
   }
@@ -2391,7 +2339,7 @@
 
     if (!selectorState.hasRows) {
       title = "Loading product data";
-      body = "The selector is waiting for the Apps Script product feed.";
+      body = "The selector is waiting for the published Strapi catalogue.";
       status = "pending";
       disabled = true;
     } else if (!selectorState.candidates.length) {
@@ -2402,7 +2350,7 @@
       const question = getDisplaySelectorColumn(selectorState.question.label);
       const count = selectorState.completeProductCount || selectorState.candidates.length;
       title = `Choose ${question}`;
-      body = `${formatInteger(count)} matching ${count === 1 ? "product" : "products"} remain. Search can still jump straight to a product, QCode or mounting surface.`;
+      body = `${formatInteger(count)} matching ${count === 1 ? "product" : "products"} remain. Search can still jump straight to a product, brand, QCode or mounting surface.`;
       target = "selector";
     } else if (!hasProduct) {
       title = "Choose a product";
@@ -2434,7 +2382,7 @@
     return [
       state.mountingSurfaceFilter !== MOUNTING_SURFACE_ALL,
       state.brandFilter !== "all",
-      state.classFilter !== "all",
+      state.classFilters.size !== getSelectableClassOptions().length,
       state.limitFilters.size > 0
     ].filter(Boolean).length;
   }
@@ -2489,10 +2437,11 @@
 
   function renderClassSelector() {
     if (!ui.classSelector) return;
+    const allSelected = state.classFilters.size === getSelectableClassOptions().length;
     ui.classSelector.innerHTML = CLASS_OPTIONS.map((option) => {
-      const selected = option.id === state.classFilter;
+      const selected = option.id === "all" ? allSelected : state.classFilters.has(option.id);
       return `
-        <button class="class-button${selected ? " selected" : ""}" type="button" data-class-filter="${escapeHtml(option.id)}" role="radio" aria-checked="${selected ? "true" : "false"}">
+        <button class="class-button${selected ? " selected" : ""}" type="button" data-class-filter="${escapeHtml(option.id)}" aria-pressed="${selected ? "true" : "false"}">
           <span>${escapeHtml(option.label)}</span>
         </button>
       `;
@@ -2546,8 +2495,15 @@
 
   function matchesBaseFilters(row) {
     return matchesBrandOption(row, getBrandOption(state.brandFilter)) &&
-      matchesClassOption(row, getClassOption(state.classFilter)) &&
+      matchesSelectedClassOptions(row) &&
       matchesLimitFilters(row);
+  }
+
+  function matchesSelectedClassOptions(row) {
+    if (!state.classFilters.size) return false;
+    return getSelectableClassOptions()
+      .filter((option) => state.classFilters.has(option.id))
+      .some((option) => matchesClassOption(row, option));
   }
 
   function matchesBrandOption(row, option) {
@@ -2613,8 +2569,13 @@
     return option || (useFallback ? state.brandOptions[0] : null);
   }
 
-  function getClassOption(id) {
-    return CLASS_OPTIONS.find((option) => option.id === id) || CLASS_OPTIONS[0];
+  function getClassOption(id, useFallback = true) {
+    const option = CLASS_OPTIONS.find((candidate) => candidate.id === id);
+    return option || (useFallback ? CLASS_OPTIONS[0] : null);
+  }
+
+  function getSelectableClassOptions() {
+    return CLASS_OPTIONS.filter((option) => option.id !== "all");
   }
 
   function getLimitFilterOption(id) {
@@ -2626,6 +2587,7 @@
   }
 
   function getDisplaySelectorValue(column, value) {
+    if (isLaminateColumnName(column) && value === NO_LAMINATE_VALUE) return NO_LAMINATE_LABEL;
     return String(value || "").trim();
   }
 
@@ -2763,10 +2725,7 @@
     productRows.forEach((row) => {
       row.rolls.forEach((roll) => {
         const existing = rollsByWidth.get(roll.width);
-        if (!existing ||
-          (existing.costEstimated && !roll.costEstimated) ||
-          (!existing.qcode && roll.qcode)
-        ) {
+        if (!existing || (!existing.qcode && roll.qcode)) {
           rollsByWidth.set(roll.width, { ...roll });
         }
       });
@@ -2774,8 +2733,6 @@
 
     const printModeOption = getPrintModeOptionForSelection(productRows, selections[PRINT_MODE_COLUMN]) ||
       getSinglePrintModeOption(productRows);
-    const printSqmRate = printModeOption?.rate ??
-      productRows.find((row) => Number.isFinite(row.printSqmRate))?.printSqmRate;
     const surfaceInfos = getProductSurfaceInfos(productRows);
     const surfaceDescription = surfaceInfos.length === 1 ? surfaceInfos[0].description : "";
     const surfaceLink = surfaceInfos.length === 1 ? surfaceInfos[0].link : "";
@@ -2784,11 +2741,12 @@
     const laminates = getSortedSelectorChoices(productRows, LAMINATE_COLUMN);
     const productSpecSheet = getFirstRowValueForColumns(productRows, PRODUCT_SPEC_SHEET_COLUMNS);
     const laminateSpecSheet = getFirstRowValueForColumns(productRows, LAMINATE_SPEC_SHEET_COLUMNS);
+    const generalDescription = getFirstRowValueForColumns(productRows, [GENERAL_DESCRIPTION_COLUMN]);
+    const generalLink = getFirstRowValueForColumns(productRows, [GENERAL_LINK_COLUMN]);
 
     return {
       name: productName.trim(),
       rolls: Array.from(rollsByWidth.values()).sort((a, b) => a.width - b.width),
-      printSqmRate,
       printMode: printModeOption?.label || "",
       surfaceDescription,
       surfaceLink,
@@ -2798,6 +2756,8 @@
       laminates,
       productSpecSheet,
       laminateSpecSheet,
+      generalDescription,
+      generalLink,
       selectorRow: productRows[0],
       selectorSelections: { ...selections }
     };
@@ -2829,51 +2789,25 @@
   }
 
   function getDistinctValues(rows, column) {
-    const values = Array.from(new Set(rows.map((row) => String(row[column] || "").trim()).filter(Boolean)));
+    const values = Array.from(new Set(rows
+      .map((row) => getSelectorRowValue(row, column))
+      .filter(Boolean)));
     return isPerforationColumnName(column) ? values.sort(comparePerforationChoices) : values;
+  }
+
+  function getSelectorRowValue(row, column) {
+    const value = String(row[column] || "").trim();
+    if (isLaminateColumnName(column) && !value) return NO_LAMINATE_VALUE;
+    return value;
+  }
+
+  function selectorRowMatchesValue(row, column, value) {
+    return getSelectorRowValue(row, column) === String(value || "").trim();
   }
 
   function getSortedSelectorChoices(rows, column) {
     const values = getDistinctValues(rows, column);
-    if (column === "Product") return sortProductChoicesByCost(rows, values);
-    if (isLaminateColumnName(column)) return sortLaminateChoicesByCost(rows, values);
-    return values;
-  }
-
-  function sortProductChoicesByCost(rows, choices) {
-    return sortChoicesByCost(choices, (choice) =>
-      getMinimumRollCost(rows.filter((row) => row.Product === choice), "cost")
-    );
-  }
-
-  function sortLaminateChoicesByCost(rows, choices) {
-    return sortChoicesByCost(choices, (choice) =>
-      getMinimumRollCost(rows.filter((row) => String(row[LAMINATE_COLUMN] || "").trim() === choice), "laminateCost")
-    );
-  }
-
-  function sortChoicesByCost(choices, getCost) {
-    return choices.slice().sort((a, b) =>
-      compareNullableNumbers(getCost(a), getCost(b)) ||
-      String(a).localeCompare(String(b))
-    );
-  }
-
-  function getMinimumRollCost(rows, costKey) {
-    const costs = rows.flatMap((row) => Array.isArray(row.rolls)
-      ? row.rolls.map((roll) => cleanNumber(roll[costKey], NaN))
-      : []);
-    const finiteCosts = costs.filter((cost) => Number.isFinite(cost) && cost >= 0);
-    return finiteCosts.length ? Math.min(...finiteCosts) : NaN;
-  }
-
-  function compareNullableNumbers(a, b) {
-    const aFinite = Number.isFinite(a);
-    const bFinite = Number.isFinite(b);
-    if (aFinite && bFinite) return a - b;
-    if (aFinite) return -1;
-    if (bFinite) return 1;
-    return 0;
+    return values.sort((a, b) => String(a).localeCompare(String(b)));
   }
 
   function getSingleDistinctValue(rows, column) {
@@ -2882,26 +2816,13 @@
   }
 
   function getPrintModeOptionsForRows(rows) {
-    const config = state.pricingConfig || DEFAULT_PRICING_CONFIG;
-    const printModes = config.printModes || {};
-    const types = getPrintModeTypesForRows(rows);
     const options = [];
-    types.forEach((type) => {
-      (printModes[type] || []).forEach((option) => addPrintModeOption(options, option.label, option.rate));
+    rows.forEach((row) => {
+      STRAPI_PRINT_MODE_FIELDS.forEach(([field, label]) => {
+        if (row.availablePrintModes?.[field] === true) addPrintModeOption(options, label);
+      });
     });
     return options;
-  }
-
-  function getPrintModeTypesForRows(rows) {
-    if (!rows.length) return [];
-    if (rows.some((row) => isClearPrintModeRow(row))) return ["clear"];
-    if (rows.some((row) => isTrueFilterCell(getRowValueForColumn(row, "Translucent")))) return ["translucent"];
-    return ["standard"];
-  }
-
-  function isClearPrintModeRow(row) {
-    return isTrueFilterCell(getRowValueForColumn(row, "Clear")) ||
-      isTrueFilterCell(getRowValueForColumn(row, "Optically Clear"));
   }
 
   function getPrintModeOptionForSelection(rows, value) {
@@ -2965,68 +2886,8 @@
     return [...state.selectorColumns, "Product", PRINT_MODE_COLUMN, ...state.postProductSelectorColumns];
   }
 
-  function evaluateRoll(product, roll, elements, settings) {
-    const printableWidth = getPrintableRollWidth(roll);
-    const pricedRoll = { ...roll, printableWidth };
-    const printDimensions = elements.map((element) => getPrintDimensions(element, settings));
-    const maxUnrotatedPrintWidth = printDimensions.reduce((max, dims) => Math.max(max, dims.printWidth), 0);
-    const unrotatedFitCount = printDimensions.filter((dims) => dims.printWidth <= printableWidth + 0.001).length;
-    const unrotatedFitsAll = unrotatedFitCount === elements.length;
-    const evenElementPlans = elements.map((element, index) =>
-      chooseElementPlan(element, index, printableWidth, settings, "even")
-    );
-    const offsetElementPlans = elements.map((element, index) =>
-      chooseElementPlan(element, index, printableWidth, settings, "right-offset")
-    );
-    const evenGroups = evenElementPlans.flatMap((plan) => plan.groups);
-    const offsetGroups = offsetElementPlans.flatMap((plan) => plan.groups);
-    const evenPack = packGroupsBestFit(evenGroups, printableWidth, "nested");
-    const offsetPack = packGroupsBestFit(offsetGroups, printableWidth, "offset");
-    const offsetSaves = offsetPack.lengthMm + 0.1 < evenPack.lengthMm;
-    const offsetJoinsUsed = settings.useOffsetJoins === true && offsetSaves;
-    const selectedPack = offsetJoinsUsed ? offsetPack : evenPack;
-    const elementPlans = offsetJoinsUsed ? offsetElementPlans : evenElementPlans;
-    const groups = offsetJoinsUsed ? offsetGroups : evenGroups;
-    const joins = elementPlans.reduce((total, plan) => total + plan.joins, 0);
-    const costs = calculateCosts(selectedPack, pricedRoll, elements, product.printSqmRate);
-
-    return {
-      productName: product.name,
-      printSqmRate: product.printSqmRate,
-      printMode: product.printMode,
-      roll: pricedRoll,
-      elementPlans,
-      evenElementPlans,
-      offsetElementPlans,
-      groups,
-      evenPack,
-      offsetPack,
-      offsetSaves,
-      offsetJoinsUsed,
-      selectedPack,
-      joins,
-      unrotatedFitsAll,
-      unrotatedFitCount,
-      maxUnrotatedPrintWidth,
-      costs
-    };
-  }
-
   function getPrintableRollWidth(roll) {
-    const config = state.pricingConfig || DEFAULT_PRICING_CONFIG;
-    const edgeMargin = Math.max(0, cleanNumber(config.edgePrintMarginMm, 0));
-    return Math.max(1, roll.width - edgeMargin * 2);
-  }
-
-  function compareRollOptions(a, b) {
-    return (
-      a.joins - b.joins ||
-      a.costs.total - b.costs.total ||
-      Number(b.unrotatedFitsAll) - Number(a.unrotatedFitsAll) ||
-      b.unrotatedFitCount - a.unrotatedFitCount ||
-      a.selectedPack.lengthMm - b.selectedPack.lengthMm ||
-      a.roll.width - b.roll.width
-    );
+    return Math.max(1, cleanNumber(roll?.printableWidth, roll?.width));
   }
 
   function chooseElementPlan(element, elementIndex, stockWidth, settings, panelMode) {
@@ -3482,59 +3343,6 @@
     };
   }
 
-  function calculateCosts(pack, roll, elements, printSqmRate) {
-    const config = state.pricingConfig || DEFAULT_PRICING_CONFIG;
-    const printLinearM = pack.lengthMm / 1000;
-    const loadingLinearM = config.materialLoadingMm / 1000;
-    const stockLinearM = printLinearM + loadingLinearM;
-    const laminateLinearM = roll.laminateCost > 0 ? printLinearM + loadingLinearM : 0;
-    const printableWidth = Math.max(1, cleanNumber(roll.printableWidth, roll.width));
-    const stockAreaSqm = (roll.width / 1000) * stockLinearM;
-    const printAreaSqm = (printableWidth / 1000) * printLinearM;
-    const productStockCharge = roll.productCost * stockLinearM * config.stockMultiplier;
-    const laminateCharge = roll.laminateCost * laminateLinearM * config.laminateMultiplier;
-    const stockCharge = productStockCharge + laminateCharge;
-    const printRate = Number.isFinite(printSqmRate) ? printSqmRate : config.printPerSqm;
-    const printCharge = printAreaSqm * printRate;
-    const trimCharge = elements.reduce((total, element) => {
-      const perimeterM = (2 * (element.width + element.height)) / 1000;
-      return total + perimeterM * element.quantity * config.trimPerLinearM;
-    }, 0);
-    const unitCharge = elements.reduce((total, element) => total + element.quantity * config.unitPrice, 0);
-    const finishedAreaSqm = elements.reduce(
-      (total, element) => total + element.quantity * (element.width * element.height) / 1000000,
-      0
-    );
-    const total = config.setupFee + stockCharge + printCharge + trimCharge + unitCharge;
-    const rate = finishedAreaSqm > 0 ? total / finishedAreaSqm : 0;
-
-    return {
-      linearM: stockLinearM,
-      printLinearM,
-      loadingLinearM,
-      stockLinearM,
-      laminateLinearM,
-      stockAreaSqm,
-      printAreaSqm,
-      productStockCharge,
-      laminateCharge,
-      stockCharge,
-      printCharge,
-      printRate,
-      trimCharge,
-      unitCharge,
-      setupFee: config.setupFee,
-      finishedAreaSqm,
-      total,
-      rate
-    };
-  }
-
-  function getEffectivePrintSqmRate(product) {
-    const config = state.pricingConfig || DEFAULT_PRICING_CONFIG;
-    return Number.isFinite(product?.printSqmRate) ? product.printSqmRate : config.printPerSqm;
-  }
-
   function parseElements(text) {
     const rows = parseDelimited(text);
     const elements = [];
@@ -3637,10 +3445,10 @@
       : printModeColumnIndex + 1;
   }
 
-  function addPrintModeOption(options, label, rate) {
+  function addPrintModeOption(options, label) {
     const key = normalizeKey(label);
     if (!key || options.some((option) => normalizeKey(option.label) === key)) return;
-    options.push({ label, rate });
+    options.push({ label });
   }
 
   function normalizeConfigValue(key, value, unit) {
@@ -3861,7 +3669,6 @@
     }
 
     data.rolls = extractRolls(data);
-    data.printSqmRate = cleanNumber(data["Print SQM Rate"], NaN);
     data.isCompleteProduct = Boolean(data.Product && data.rolls.length);
     return data;
   }
@@ -4078,58 +3885,20 @@
   }
 
   function extractRolls(row) {
-    const entries = Object.keys(row).map((key) => {
+    return Object.keys(row).map((key) => {
       const match = getSeriesMatch(key, "Width");
       if (!match) return null;
       const suffix = match.suffix;
       const width = cleanNumber(row[key], NaN);
-      const productCostEntry = getSeriesEntry(row, ["Product Cost", "Cost"], suffix);
-      const laminateCostEntry = getSeriesEntry(row, ["Lam Cost", "Laminate Cost"], suffix);
       const qcodeEntry = getSeriesEntry(row, ["QCode", "Product QCode"], suffix);
-      const productCost = cleanNumber(productCostEntry.value, NaN);
-      const laminateCost = cleanNumber(laminateCostEntry.value, NaN);
       return {
         suffix: Number.parseInt(suffix, 10),
         width,
-        productCost,
-        productCostColumn: productCostEntry.key || `Product Cost${suffix}`,
-        laminateCost,
-        laminateCostColumn: laminateCostEntry.key || `Lam Cost${suffix}`,
         qcode: String(qcodeEntry.value || "").trim(),
         qcodeColumn: qcodeEntry.key || `QCode${suffix}`
       };
     }).filter((entry) => entry && Number.isFinite(entry.width) && entry.width > 0)
       .sort((a, b) => a.suffix - b.suffix);
-
-    const productPricedEntries = entries.filter((entry) => Number.isFinite(entry.productCost) && entry.productCost >= 0);
-    return entries.map((entry) => {
-      const productDirect = Number.isFinite(entry.productCost) && entry.productCost >= 0;
-      const productFallback = productDirect ? entry : findClosestPricedRoll(entry, productPricedEntries, "productCost");
-      if (!productFallback) return null;
-
-      const laminateDirect = Number.isFinite(entry.laminateCost) && entry.laminateCost >= 0;
-      const laminateCost = laminateDirect ? entry.laminateCost : 0;
-      const productCost = productDirect ? entry.productCost : productFallback.productCost;
-
-      return {
-        width: entry.width,
-        productCost,
-        productCostEstimated: !productDirect,
-        productCostColumn: entry.productCostColumn,
-        productCostSourceWidth: productFallback.width,
-        productCostSourceColumn: productFallback.productCostColumn,
-        laminateCost,
-        laminateCostEstimated: false,
-        laminateCostColumn: entry.laminateCostColumn,
-        laminateCostSourceWidth: entry.width,
-        laminateCostSourceColumn: entry.laminateCostColumn,
-        qcode: entry.qcode,
-        qcodeColumn: entry.qcodeColumn,
-        cost: productCost + laminateCost,
-        costEstimated: !productDirect,
-        costSourceWidth: !productDirect ? productFallback.width : entry.width
-      };
-    }).filter(Boolean).sort((a, b) => a.width - b.width);
   }
 
   function getSeriesMatch(header, label) {
@@ -4144,15 +3913,6 @@
       labelList.some((label) => normalizeKey(candidate) === normalizeKey(`${label}${suffix}`))
     );
     return { key, value: key ? row[key] : "" };
-  }
-
-  function findClosestPricedRoll(entry, pricedEntries, costKey) {
-    if (!pricedEntries.length) return null;
-    return pricedEntries.slice().sort((a, b) =>
-      Math.abs(a.width - entry.width) - Math.abs(b.width - entry.width) ||
-      Math.abs((a[costKey] || 0) - (entry[costKey] || 0)) - Math.abs((b[costKey] || 0) - (entry[costKey] || 0)) ||
-      a.suffix - b.suffix
-    )[0];
   }
 
   function parseDelimited(text) {
@@ -4243,9 +4003,6 @@
     ui.metricJoins.textContent = formatInteger(best.joins);
     ui.metricPrice.textContent = formatMoney(best.costs.total);
     ui.metricRate.textContent = `${formatMoney(best.costs.rate)} / sqm`;
-    if (ui.printRateConstant) {
-      ui.printRateConstant.textContent = `${formatMoney(best.costs.printRate)} / sqm`;
-    }
     const widestRoll = options.reduce((max, option) => Math.max(max, option.roll.printableWidth || option.roll.width), 0);
     const fitWarning = getStockFitWarning(best.maxUnrotatedPrintWidth, widestRoll);
     ui.costBreakdown.innerHTML = "";
@@ -4289,7 +4046,7 @@
     ui.metricPrice.textContent = "$0.00";
     ui.metricRate.textContent = "$0.00 / sqm";
     if (ui.printRateConstant) {
-      ui.printRateConstant.textContent = state.selectedProduct ? `${formatMoney(getEffectivePrintSqmRate(state.selectedProduct))} / sqm` : "Select product";
+      ui.printRateConstant.textContent = "Pricing Engine";
     }
     ui.costBreakdown.innerHTML = "";
     renderArtworkFitWarning("");
@@ -4339,8 +4096,13 @@
   }
 
   function renderSelectorSurvey(selectorState) {
+    const product = selectorState.product || selectorState.previewProduct;
+    const selectedProductName = String(selectorState.selections?.Product || product?.name || "").trim();
+    const selectionOrder = getSelectorSelectionOrder();
+    const productIndex = selectionOrder.indexOf("Product");
     const path = selectorState.pathEntries
       .filter((entry) => entry.value)
+      .filter((entry) => !selectedProductName || selectionOrder.indexOf(entry.column) < productIndex)
       .map((entry) => {
         const column = getDisplaySelectorColumn(entry.column);
         const value = getDisplaySelectorValue(entry.column, entry.value);
@@ -4348,23 +4110,32 @@
       })
       .join("");
 
-    const nestedProductQuestion = getNestedProductQuestion(selectorState);
-    const questionMarkup = selectorState.question && !nestedProductQuestion
+    const questionIsProductOption = selectorState.question && selectedProductName &&
+      [PRINT_MODE_COLUMN, LAMINATE_COLUMN].some((column) =>
+        normalizeKey(column) === normalizeKey(selectorState.question.column)
+      );
+    const questionMarkup = selectorState.question && !questionIsProductOption
       ? renderSelectorQuestion(selectorState.question)
       : "";
 
-    const product = selectorState.product || selectorState.previewProduct;
-    const productBrowseMarkup = renderProductBrowseChoices(selectorState, nestedProductQuestion);
     const productMarkup = product ? `
       <div class="selected-product">
-        <strong>${escapeHtml(product.name)}</strong>
-        <div class="muted">${escapeHtml(product.rolls.map(formatRollLabel).join(" | "))}</div>
-        ${renderProductLaminate(product)}
-        ${renderProductPrintMode(product)}
-        ${renderProductLongevity(product)}
-        ${renderProductMountingSurfaces(product)}
-        ${renderProductSpecSheetLinks(product)}
-        ${renderProductSurfaceInfo(product)}
+        <div class="selected-product-heading">
+          <div>
+            <span class="selected-product-label">Selected product</span>
+            <strong>${escapeHtml(product.name)}</strong>
+          </div>
+          <button class="ghost-button compact" type="button" data-selector-change-product="true">Change product</button>
+        </div>
+        ${renderProductOptionWorkflow(selectorState, product)}
+        <div class="selected-product-details">
+          <div class="muted">${escapeHtml(product.rolls.map(formatRollLabel).join(" | "))}</div>
+          ${renderProductLongevity(product)}
+          ${renderProductMountingSurfaces(product)}
+          ${renderProductSpecSheetLinks(product)}
+          ${renderProductGeneralInfo(product)}
+          ${renderProductSurfaceInfo(product)}
+        </div>
       </div>
     ` : (!selectorState.question ? renderSelectorEmptyState(selectorState) : "");
 
@@ -4377,7 +4148,6 @@
     ui.selectorSurvey.innerHTML = `
       ${path ? `<div class="survey-path">${path}</div>` : ""}
       ${questionMarkup}
-      ${productBrowseMarkup}
       ${productMarkup}
       ${resetMarkup}
     `;
@@ -4409,66 +4179,69 @@
     `;
   }
 
-  function getNestedProductQuestion(selectorState) {
-    const question = selectorState.question;
+  function renderProductOptionWorkflow(selectorState, product) {
     const selections = selectorState.selections || {};
-    if (state.productSearchSelection) return null;
-    if (!question || !selections.Product || question.column === "Product") return null;
+    const rows = getProductWorkflowRows(selectorState, product.name);
+    const printOptions = getPrintModeOptionsForRows(rows);
+    const explicitPrintMode = String(selections[PRINT_MODE_COLUMN] || "").trim();
+    const selectedPrintMode = printOptions.find((option) =>
+      normalizeKey(option.label) === normalizeKey(explicitPrintMode)
+    ) || (printOptions.length === 1 ? printOptions[0] : null);
+    const printResolved = printOptions.length <= 1 || Boolean(selectedPrintMode);
+    const laminateChoices = getSortedSelectorChoices(rows, LAMINATE_COLUMN).filter(isMeaningfulSelectorValue);
+    const explicitLaminate = String(selections[LAMINATE_COLUMN] || "").trim();
+    const selectedLaminate = laminateChoices.find((choice) =>
+      normalizeKey(choice) === normalizeKey(explicitLaminate)
+    ) || (laminateChoices.length === 1 ? laminateChoices[0] : "");
 
-    const order = getSelectorSelectionOrder();
-    const productIndex = order.indexOf("Product");
-    const questionIndex = order.indexOf(question.column);
-    if (productIndex < 0 || questionIndex <= productIndex) return null;
-
-    return getBrowseProductChoices(selections).length > 1 ? question : null;
-  }
-
-  function renderProductBrowseChoices(selectorState, nestedQuestion = null) {
-    if (state.productSearchSelection) return "";
-    const selectedProduct = String(selectorState.selections?.Product || selectorState.product?.name || "").trim();
-    if (!selectedProduct) return "";
-
-    const choices = getBrowseProductChoices(selectorState.selections || {});
-    if (choices.length <= 1) return "";
-
-    const selectedKey = normalizeKey(selectedProduct);
     return `
-      <div class="survey-question product-browse">
-        <strong>Product options</strong>
-        <div class="choice-grid">
-          ${choices.map((choice) => {
-            const selected = normalizeKey(choice) === selectedKey;
-            return `
-              <div class="product-browse-item${selected ? " selected" : ""}">
-                <button class="choice-button${selected ? " selected" : ""}" type="button" data-selector-column="Product" data-selector-value="${escapeHtml(choice)}" data-selector-preserve-after="true" aria-pressed="${selected ? "true" : "false"}">${escapeHtml(getDisplaySelectorValue("Product", choice))}</button>
-                ${selected && nestedQuestion ? renderNestedProductQuestion(nestedQuestion) : ""}
-              </div>
-            `;
-          }).join("")}
+      <div class="product-option-workflow">
+        <div class="product-option-step">
+          <div class="product-option-step-heading">
+            <strong>Print Options</strong>
+            ${printOptions.length === 1 ? `<span>Automatically selected</span>` : ""}
+          </div>
+          <div class="choice-grid product-option-choices">
+            ${printOptions.length ? printOptions.map((option) =>
+              renderProductOptionButton(PRINT_MODE_COLUMN, option.label, selectedPrintMode?.label)
+            ).join("") : `<div class="product-option-empty">No print option configured</div>`}
+          </div>
         </div>
+        ${printResolved ? `
+          <div class="product-option-step">
+            <div class="product-option-step-heading">
+              <strong>Laminate</strong>
+              ${laminateChoices.length === 1 ? `<span>Automatically selected</span>` : ""}
+            </div>
+            <div class="choice-grid product-option-choices">
+              ${laminateChoices.length ? laminateChoices.map((choice) =>
+                renderProductOptionButton(LAMINATE_COLUMN, choice, selectedLaminate)
+              ).join("") : `<div class="choice-button selected product-option-static" aria-pressed="true">No laminate</div>`}
+            </div>
+          </div>
+        ` : ""}
       </div>
     `;
   }
 
-  function renderNestedProductQuestion(question) {
-    return `
-      <div class="product-browse-nested">
-        <strong>${escapeHtml(getDisplaySelectorColumn(question.label))}</strong>
-        <div class="choice-grid nested-choice-grid">
-          ${question.choices.map((choice) => `
-            <button class="choice-button" type="button" data-selector-column="${escapeHtml(question.column)}" data-selector-value="${escapeHtml(choice)}">${escapeHtml(getDisplaySelectorValue(question.column, choice))}</button>
-          `).join("")}
-        </div>
-      </div>
-    `;
+  function renderProductOptionButton(column, value, selectedValue) {
+    const selected = normalizeKey(value) === normalizeKey(selectedValue);
+    return `<button class="choice-button${selected ? " selected" : ""}" type="button" data-selector-column="${escapeHtml(column)}" data-selector-value="${escapeHtml(value)}" aria-pressed="${selected ? "true" : "false"}">${escapeHtml(getDisplaySelectorValue(column, value))}</button>`;
   }
 
-  function getBrowseProductChoices(selections) {
-    const baseSelections = getSelectionsBeforeColumn(selections, "Product");
-    return getSortedSelectorChoices(
-      getCandidateSelectorRows(baseSelections).filter((row) => row.isCompleteProduct),
-      "Product"
-    );
+  function getProductWorkflowRows(selectorState, productName) {
+    const product = String(productName || "").trim();
+    if (!product) return [];
+    if (state.productSearchSelection) {
+      return state.productSearchSelection.rows.filter((row) =>
+        state.selectorRows.includes(row) && row.isCompleteProduct && row.Product === product && matchesSelectedFilters(row)
+      );
+    }
+    const selections = {
+      ...getSelectionsBeforeColumn(selectorState.selections || {}, "Product"),
+      Product: product
+    };
+    return getCandidateSelectorRows(selections).filter((row) => row.isCompleteProduct);
   }
 
   function getSelectionsBeforeColumn(selections, column) {
@@ -4487,20 +4260,6 @@
     const label = surfaces.length === 1 ? "Mounting surface" : "Mounting surfaces";
     const surfaceLabels = surfaces.map((surface) => getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, surface));
     return `<div class="muted">${escapeHtml(`${label}: ${surfaceLabels.join(", ")}`)}</div>`;
-  }
-
-  function renderProductPrintMode(product) {
-    const printMode = String(product.printMode || "").trim();
-    return printMode ? `<div class="muted">${escapeHtml(`Print mode: ${printMode}`)}</div>` : "";
-  }
-
-  function renderProductLaminate(product) {
-    const laminates = Array.isArray(product.laminates)
-      ? product.laminates.filter(Boolean)
-      : [];
-    if (!laminates.length) return "";
-    const label = laminates.length === 1 ? "Laminate" : "Laminates";
-    return `<div class="muted">${escapeHtml(`${label}: ${laminates.join(", ")}`)}</div>`;
   }
 
   function renderProductSpecSheetLinks(product) {
@@ -4534,6 +4293,33 @@
     if (!longevities.length) return "";
     const label = longevities.length === 1 ? "Longevity" : "Longevities";
     return `<div class="muted">${escapeHtml(`${label}: ${longevities.join(", ")}`)}</div>`;
+  }
+
+  function getNextProductOptionQuestion(candidates, selections) {
+    const printModeQuestion = getPrintModeQuestion(candidates, selections);
+    if (printModeQuestion) return printModeQuestion;
+
+    for (const column of state.postProductSelectorColumns) {
+      if (!shouldShowSelectorColumn(column) || selections[column]) continue;
+      const choices = getSortedSelectorChoices(candidates, column);
+      if (choices.length > 1) return { column, label: column, choices };
+    }
+
+    return null;
+  }
+
+  function renderProductGeneralInfo(product) {
+    const description = String(product.generalDescription || "").trim();
+    const link = normalizePreviewUrl(product.generalLink);
+    if (!description && !link) return "";
+
+    return `
+      <div class="product-general-info">
+        <div class="product-surface-label">General information</div>
+        ${description ? `<div class="product-description">${formatDescription(description)}</div>` : ""}
+        ${link ? renderOpenGraphPreviewShell(link) : ""}
+      </div>
+    `;
   }
 
   function renderProductSurfaceInfo(product) {
@@ -4767,7 +4553,7 @@
   function hasActiveSelectorFilters() {
     return state.mountingSurfaceFilter !== MOUNTING_SURFACE_ALL ||
       state.brandFilter !== "all" ||
-      state.classFilter !== "all" ||
+      state.classFilters.size !== getSelectableClassOptions().length ||
       state.limitFilters.size > 0 ||
       Boolean(state.productSearchQuery.trim());
   }
@@ -4937,13 +4723,16 @@
   function renderOptions(options, best) {
     ui.optionCount.textContent = `${options.length} stock widths`;
     ui.optionsBody.innerHTML = options.map((option) => {
-      const selected = option === best ? " class=\"selected-row\"" : "";
+      const selected = String(option.roll.qcode || "") === String(best.roll.qcode || "") ? " class=\"selected-row\"" : "";
       const offsetText = option.offsetSaves
         ? `${formatNumber(option.offsetPack.lengthMm / 1000, 2)} m`
         : "No saving";
       return `
         <tr${selected}>
           <td>${escapeHtml(formatRollWidthLabel(option.roll))}</td>
+          <td><code>${escapeHtml(option.roll.qcode || "—")}</code></td>
+          <td>${escapeHtml(formatStockQoh(option.roll.qohProduct))}</td>
+          <td>${escapeHtml(formatLaminateStockQoh(option.roll))}</td>
           <td>${formatInteger(option.joins)}</td>
           <td>${formatNumber(option.evenPack.lengthMm / 1000, 2)} m</td>
           <td>${offsetText}</td>
@@ -4959,10 +4748,11 @@
     const canSubmit = canSubmitCart();
     ui.pricingBody.innerHTML = elements.map((element, index) => {
       const plan = best.elementPlans.find((item) => item.elementIndex === index);
-      const areaSqm = (element.width * element.height) / 1000000;
-      const lineArea = areaSqm * element.quantity;
-      const lineTotal = lineArea * best.costs.rate;
-      const unit = element.quantity > 0 ? lineTotal / element.quantity : 0;
+      const authoritativeLine = best.lines?.[index];
+      if (!plan || !authoritativeLine) return "";
+      const lineArea = Number(authoritativeLine.areaSqm) || 0;
+      const lineTotal = Number(authoritativeLine.lineTotal) || 0;
+      const unit = Number(authoritativeLine.unitPrice) || 0;
       const printSize = `${formatNumber(plan.printWidth, 0)} x ${formatNumber(plan.printHeight, 0)} mm${plan.rotated ? " rotated" : ""}`;
       const dropsText = plan.drops > 1 ? `${formatInteger(plan.drops)} vertical` : formatInteger(plan.drops);
       const hasQCode = Boolean(best.roll?.qcode);
@@ -5526,7 +5316,13 @@
 
     return [
       ...getSelectorSelectionEmailLines(product),
-      getArraySummaryLine("Laminate", "Laminates", product.laminates),
+      getArraySummaryLine(
+        "Laminate",
+        "Laminates",
+        Array.isArray(product.laminates)
+          ? product.laminates.map((value) => getDisplaySelectorValue(LAMINATE_COLUMN, value))
+          : []
+      ),
       product.printMode ? `Print mode: ${product.printMode}` : "",
       getArraySummaryLine("Mounting surface", "Mounting surfaces", getDisplayMountingSurfaceValues(product.mountingSurfaces)),
       getArraySummaryLine("Longevity", "Longevities", product.longevities),
@@ -5550,10 +5346,7 @@
       `Roll width: ${formatInteger(roll.width)} mm`,
       `Printable width: ${formatInteger(printableWidth)} mm`,
       roll.qcode ? `QCode: ${roll.qcode}` : "",
-      Number.isFinite(roll.productCost) ? `Product cost: ${formatMoney(roll.productCost)} / lm` : "",
-      Number.isFinite(roll.laminateCost) && roll.laminateCost > 0 ? `Laminate cost: ${formatMoney(roll.laminateCost)} / lm` : "",
       `Print mode: ${best.printMode || "Standard"}`,
-      `Print SQM rate: ${formatMoney(best.costs.printRate)} / sqm`,
       `Imposed length: ${formatNumber(best.costs.printLinearM, 2)} m`,
       `Stock length charged: ${formatNumber(best.costs.linearM, 2)} m`,
       `Joins: ${formatInteger(best.joins)}`,
@@ -5650,6 +5443,20 @@
     return new Intl.NumberFormat("en-AU", { maximumFractionDigits: 0 }).format(value || 0);
   }
 
+  function formatStockQoh(value) {
+    const number = normalizeQoh(value);
+    return number === null
+      ? "—"
+      : new Intl.NumberFormat("en-AU", { maximumFractionDigits: 2 }).format(number);
+  }
+
+  function formatLaminateStockQoh(roll) {
+    const value = normalizeQoh(roll?.qohLaminate);
+    if (value !== null) return formatStockQoh(value);
+    if (roll?.inventorySource === "vivtrack" && !roll?.jtCodeLaminate) return "N/A";
+    return "—";
+  }
+
   function formatRollLabel(roll) {
     const qcode = roll.qcode ? ` · ${roll.qcode}` : "";
     return `${formatRollWidthLabel(roll)}${qcode}`;
@@ -5678,20 +5485,7 @@
 
   window.RollStockCalculator = {
     parseElements,
-    parseConfigCsv,
-    parseSelectorCsv,
-    evaluateRoll,
     buildSavQuoteRequest,
-    getCartShortname,
-    constants: {
-      TILE_OFFSET_MM,
-      MATERIAL_LOADING_MM,
-      SETUP_FEE,
-      TRIM_PER_LINEAR_M,
-      STOCK_MULTIPLIER,
-      LAMINATE_MULTIPLIER,
-      PRINT_PER_SQM,
-      UNIT_PRICE
-    }
+    getCartShortname
   };
 })();
