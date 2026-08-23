@@ -71,6 +71,8 @@
   const TYPE_COLUMN = "Type";
   const LONGEVITY_COLUMN = "Longevity";
   const LAMINATE_COLUMN = "Laminate";
+  const NO_LAMINATE_VALUE = "__no_laminate__";
+  const NO_LAMINATE_LABEL = "No laminate";
   const PRINT_MODE_COLUMN = "Print Mode";
   const GENERAL_DESCRIPTION_COLUMN = "General Description";
   const GENERAL_LINK_COLUMN = "General Link";
@@ -2199,9 +2201,7 @@
   }
 
   function getCommonSelectorValue(rows, column) {
-    const values = Array.from(new Set(rows
-      .map((row) => String(row[column] || "").trim())
-      .filter(isMeaningfulSelectorValue)));
+    const values = getDistinctValues(rows, column).filter(isMeaningfulSelectorValue);
     return values.length === 1 ? values[0] : "";
   }
 
@@ -2215,7 +2215,7 @@
   function filterSelectorRowsBySelections(rows, selections) {
     return rows.filter((row) =>
       Object.entries(selections).every(([column, value]) =>
-        isSyntheticSelectorColumn(column) || !value || String(row[column] || "") === value
+        isSyntheticSelectorColumn(column) || !value || selectorRowMatchesValue(row, column, value)
       )
     );
   }
@@ -2587,6 +2587,7 @@
   }
 
   function getDisplaySelectorValue(column, value) {
+    if (isLaminateColumnName(column) && value === NO_LAMINATE_VALUE) return NO_LAMINATE_LABEL;
     return String(value || "").trim();
   }
 
@@ -2788,8 +2789,20 @@
   }
 
   function getDistinctValues(rows, column) {
-    const values = Array.from(new Set(rows.map((row) => String(row[column] || "").trim()).filter(Boolean)));
+    const values = Array.from(new Set(rows
+      .map((row) => getSelectorRowValue(row, column))
+      .filter(Boolean)));
     return isPerforationColumnName(column) ? values.sort(comparePerforationChoices) : values;
+  }
+
+  function getSelectorRowValue(row, column) {
+    const value = String(row[column] || "").trim();
+    if (isLaminateColumnName(column) && !value) return NO_LAMINATE_VALUE;
+    return value;
+  }
+
+  function selectorRowMatchesValue(row, column, value) {
+    return getSelectorRowValue(row, column) === String(value || "").trim();
   }
 
   function getSortedSelectorChoices(rows, column) {
@@ -5303,7 +5316,13 @@
 
     return [
       ...getSelectorSelectionEmailLines(product),
-      getArraySummaryLine("Laminate", "Laminates", product.laminates),
+      getArraySummaryLine(
+        "Laminate",
+        "Laminates",
+        Array.isArray(product.laminates)
+          ? product.laminates.map((value) => getDisplaySelectorValue(LAMINATE_COLUMN, value))
+          : []
+      ),
       product.printMode ? `Print mode: ${product.printMode}` : "",
       getArraySummaryLine("Mounting surface", "Mounting surfaces", getDisplayMountingSurfaceValues(product.mountingSurfaces)),
       getArraySummaryLine("Longevity", "Longevities", product.longevities),
