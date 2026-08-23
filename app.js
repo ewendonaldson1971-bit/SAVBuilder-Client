@@ -471,12 +471,19 @@
     });
 
     ui.selectorSurvey.addEventListener("click", (event) => {
+      const imagePreview = event.target.closest("[data-product-image-preview]");
       const galleryTrigger = event.target.closest("[data-product-gallery-open]");
       const choice = event.target.closest("[data-selector-column]");
       const reset = event.target.closest("[data-selector-reset]");
       const back = event.target.closest("[data-selector-back]");
       const changeProduct = event.target.closest("[data-selector-change-product]");
       const clearFilters = event.target.closest("[data-selector-clear-filters]");
+
+      if (imagePreview) {
+        event.preventDefault();
+        openProductGallery(state.selectedProduct, imagePreview.dataset.productImagePreview);
+        return;
+      }
 
       if (galleryTrigger) {
         openProductGallery(state.selectedProduct);
@@ -4383,11 +4390,19 @@
     `;
   }
 
-  function openProductGallery(product) {
+  function openProductGallery(product, initialImageUrl = "") {
     const images = Array.isArray(product?.galleryImages) ? product.galleryImages.filter((image) => image?.url) : [];
+    const normalizedInitialUrl = normalizePreviewUrl(initialImageUrl);
+    let initialIndex = normalizedInitialUrl
+      ? images.findIndex((image) => normalizePreviewUrl(image.url) === normalizedInitialUrl)
+      : 0;
+    if (normalizedInitialUrl && initialIndex < 0) {
+      images.unshift({ url: normalizedInitialUrl, thumbnailUrl: normalizedInitialUrl });
+      initialIndex = 0;
+    }
     if (!images.length || !ui.productGallery) return;
     state.productGalleryImages = images;
-    state.productGalleryIndex = 0;
+    state.productGalleryIndex = Math.max(0, initialIndex);
     ui.productGalleryTitle.textContent = product?.name || "Product photos";
     renderProductGallery();
     ui.productGallery.showModal();
@@ -4524,9 +4539,9 @@
 
   function renderImagePreviewShell(url) {
     return `
-      <a class="og-preview image-preview" href="${escapeHtml(url)}" target="_blank" rel="noopener">
+      <button class="og-preview image-preview" type="button" data-product-image-preview="${escapeHtml(url)}" aria-haspopup="dialog" aria-label="Open product image gallery">
         ${renderImagePreviewContent(url)}
-      </a>
+      </button>
     `;
   }
 
@@ -4550,6 +4565,12 @@
     if (await canLoadImageUrl(url)) {
       if (!card.isConnected || card.dataset.ogPreviewUrl !== url) return;
       card.classList.add("image-preview");
+      card.dataset.productImagePreview = url;
+      card.setAttribute("role", "button");
+      card.setAttribute("aria-haspopup", "dialog");
+      card.setAttribute("aria-label", "Open product image gallery");
+      card.removeAttribute("target");
+      card.removeAttribute("rel");
       delete card.dataset.ogPreviewUrl;
       card.innerHTML = renderImagePreviewContent(url);
       return;
