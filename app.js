@@ -2582,8 +2582,10 @@
   }
 
   function matchesSelectedClassOptions(row) {
+    const classOptions = getSelectableClassOptions();
+    if (classOptions.every((option) => state.classFilters.has(option.id))) return true;
     if (!state.classFilters.size) return false;
-    return getSelectableClassOptions()
+    return classOptions
       .filter((option) => state.classFilters.has(option.id))
       .some((option) => matchesClassOption(row, option));
   }
@@ -4378,13 +4380,17 @@
   }
 
   function renderProductGalleryControl(product) {
-    const count = Array.isArray(product.galleryImages) ? product.galleryImages.length : 0;
+    const images = Array.isArray(product.galleryImages) ? product.galleryImages.filter((image) => image?.url) : [];
+    const count = images.length;
     if (!count) return "";
+    const thumbnailUrl = images[0].thumbnailUrl || images[0].url;
+    const photoLabel = count === 1 ? "1 photo" : `${count} photos`;
     return `
       <div class="product-gallery-control">
         <button class="product-gallery-trigger" type="button" data-product-gallery-open="true" aria-haspopup="dialog">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 15l4-4 4 4 2-2 6 6M15.5 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg>
-          <span>View photos (${count})</span>
+          <span class="product-gallery-trigger-media"><img src="${escapeHtml(thumbnailUrl)}" alt="" loading="lazy"></span>
+          <span class="product-gallery-trigger-copy"><strong>View gallery</strong><span>Product photos</span></span>
+          <span class="product-gallery-trigger-count">${escapeHtml(photoLabel)}</span>
         </button>
       </div>
     `;
