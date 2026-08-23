@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cabin:wght@500;600;700&family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=vivad-style-retrofit-20260725">
+    <link rel="stylesheet" href="styles.css?v=product-gallery-20260823">
   </head>
   <body>
     <header class="app-header">
@@ -308,6 +308,27 @@
       </section>
     </main>
 
+    <dialog id="product-gallery" class="product-gallery-dialog" aria-labelledby="product-gallery-title">
+      <div class="product-gallery-shell">
+        <header class="product-gallery-heading">
+          <div><p class="eyebrow">Product gallery</p><h2 id="product-gallery-title">Product photos</h2></div>
+          <button type="button" id="product-gallery-close" aria-label="Close product gallery">×</button>
+        </header>
+        <div class="product-gallery-stage">
+          <button class="product-gallery-direction previous" type="button" id="product-gallery-previous" aria-label="Previous image">‹</button>
+          <figure>
+            <img id="product-gallery-image" src="" alt="">
+            <figcaption id="product-gallery-caption"></figcaption>
+          </figure>
+          <button class="product-gallery-direction next" type="button" id="product-gallery-next" aria-label="Next image">›</button>
+        </div>
+        <footer class="product-gallery-footer">
+          <span id="product-gallery-counter" aria-live="polite"></span>
+          <div id="product-gallery-thumbnails" class="product-gallery-thumbnails" aria-label="Choose a product photo"></div>
+        </footer>
+      </div>
+    </dialog>
+
     <dialog id="pricing-login" class="pricing-login-dialog">
       <form id="pricing-login-form" method="dialog">
         <div class="pricing-login-heading"><div><p class="eyebrow">Vivad secure access</p><h2>Connect Pricing Service</h2></div><button type="button" id="pricing-login-close" aria-label="Close">×</button></div>
@@ -322,7 +343,7 @@
     <script src="pdfjs/pdf.classic.js"></script>
     <script src="pdfjs/pdf.worker.classic.js"></script>
     <script
-      src="app.js?v=consolidated-20260823"
+      src="app.js?v=product-gallery-20260823"
       data-apps-script-url="https://script.google.com/macros/s/AKfycbwN0Ocx_0jE9VD4nQLOAV9NaycPF9pRDe4Z3GmUTfLKWamcJjmz48MxdB7AQ6xlZrCu/exec"
       data-strapi-url="https://strapi.vivad.com.au"
       data-pricing-api-url="https://vivadpricing-app.calmtree-53cc02bb.australiasoutheast.azurecontainerapps.io"

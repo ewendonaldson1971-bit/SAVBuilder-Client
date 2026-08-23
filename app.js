@@ -193,7 +193,9 @@
     cartSubmissionBusy: false,
     pricingApiToken: window.sessionStorage.getItem("savBuilderPricingToken") || "",
     pricingApiUser: window.sessionStorage.getItem("savBuilderPricingUser") || "",
-    pricingQuoteRequestId: 0
+    pricingQuoteRequestId: 0,
+    productGalleryImages: [],
+    productGalleryIndex: 0
   };
 
   const ui = {};
@@ -293,6 +295,15 @@
     ui.pricingUsername = document.getElementById("pricing-username");
     ui.pricingPassword = document.getElementById("pricing-password");
     ui.pricingLoginError = document.getElementById("pricing-login-error");
+    ui.productGallery = document.getElementById("product-gallery");
+    ui.productGalleryTitle = document.getElementById("product-gallery-title");
+    ui.productGalleryImage = document.getElementById("product-gallery-image");
+    ui.productGalleryCaption = document.getElementById("product-gallery-caption");
+    ui.productGalleryCounter = document.getElementById("product-gallery-counter");
+    ui.productGalleryPrevious = document.getElementById("product-gallery-previous");
+    ui.productGalleryNext = document.getElementById("product-gallery-next");
+    ui.productGalleryThumbnails = document.getElementById("product-gallery-thumbnails");
+    ui.productGalleryClose = document.getElementById("product-gallery-close");
   }
 
   function applyAppMode() {
@@ -315,6 +326,36 @@
     ui.pricingLoginClose?.addEventListener("click", () => ui.pricingLogin.close());
     ui.pricingLoginCancel?.addEventListener("click", () => ui.pricingLogin.close());
     ui.pricingLoginForm?.addEventListener("submit", connectPricingService);
+    ui.productGalleryClose?.addEventListener("click", closeProductGallery);
+    ui.productGalleryPrevious?.addEventListener("click", () => moveProductGallery(-1));
+    ui.productGalleryNext?.addEventListener("click", () => moveProductGallery(1));
+    ui.productGalleryThumbnails?.addEventListener("click", (event) => {
+      const thumbnail = event.target.closest("[data-gallery-index]");
+      if (!thumbnail) return;
+      setProductGalleryIndex(Number.parseInt(thumbnail.dataset.galleryIndex, 10));
+    });
+    ui.productGallery?.addEventListener("click", (event) => {
+      if (event.target === ui.productGallery) closeProductGallery();
+    });
+    ui.productGallery?.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        moveProductGallery(-1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        moveProductGallery(1);
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        setProductGalleryIndex(0);
+      } else if (event.key === "End") {
+        event.preventDefault();
+        setProductGalleryIndex(state.productGalleryImages.length - 1);
+      }
+    });
+    ui.productGallery?.addEventListener("close", () => {
+      state.productGalleryImages = [];
+      state.productGalleryIndex = 0;
+    });
     document.querySelectorAll(".help-button").forEach((button) => {
       button.addEventListener("pointerdown", (event) => event.stopPropagation());
       button.addEventListener("keydown", (event) => event.stopPropagation());
@@ -430,11 +471,17 @@
     });
 
     ui.selectorSurvey.addEventListener("click", (event) => {
+      const galleryTrigger = event.target.closest("[data-product-gallery-open]");
       const choice = event.target.closest("[data-selector-column]");
       const reset = event.target.closest("[data-selector-reset]");
       const back = event.target.closest("[data-selector-back]");
       const changeProduct = event.target.closest("[data-selector-change-product]");
       const clearFilters = event.target.closest("[data-selector-clear-filters]");
+
+      if (galleryTrigger) {
+        openProductGallery(state.selectedProduct);
+        return;
+      }
 
       if (reset) {
         resetSurveyAndFilters();
@@ -1347,6 +1394,7 @@
       [LEGACY_SURFACE_COLUMN]: surface,
       "Product Spec Sheet": productSpecSheet,
       "Laminate Spec Sheet": laminateSpecSheet,
+      galleryImages: getStrapiMediaItems(entry.galleryImages),
       [GENERAL_DESCRIPTION_COLUMN]: String(entry.generalDescription || "").trim(),
       [GENERAL_LINK_COLUMN]: String(entry.generalLink || "").trim(),
       "Surface Description": String(surfaceInfo?.description || "").trim(),
@@ -1451,6 +1499,33 @@
     if (value.url) return normalizeStrapiAssetUrl(value.url);
 
     return "";
+  }
+
+  function getStrapiMediaItems(value) {
+    const source = Array.isArray(value?.data)
+      ? value.data
+      : Array.isArray(value)
+        ? value
+        : value?.data
+          ? [value.data]
+          : value
+            ? [value]
+            : [];
+
+    return source.map((item) => {
+      const media = item?.attributes || item || {};
+      const url = normalizeStrapiAssetUrl(media.url);
+      if (!url) return null;
+      const thumbnail = media.formats?.thumbnail || media.formats?.small || {};
+      return {
+        url,
+        thumbnailUrl: normalizeStrapiAssetUrl(thumbnail.url) || url,
+        alternativeText: String(media.alternativeText || "").trim(),
+        caption: String(media.caption || "").trim(),
+        width: Number(media.width) || null,
+        height: Number(media.height) || null
+      };
+    }).filter(Boolean);
   }
 
   function normalizeStrapiAssetUrl(value) {
@@ -2743,6 +2818,7 @@
     const laminateSpecSheet = getFirstRowValueForColumns(productRows, LAMINATE_SPEC_SHEET_COLUMNS);
     const generalDescription = getFirstRowValueForColumns(productRows, [GENERAL_DESCRIPTION_COLUMN]);
     const generalLink = getFirstRowValueForColumns(productRows, [GENERAL_LINK_COLUMN]);
+    const galleryImages = getProductGalleryImages(productRows);
 
     return {
       name: productName.trim(),
@@ -2758,9 +2834,20 @@
       laminateSpecSheet,
       generalDescription,
       generalLink,
+      galleryImages,
       selectorRow: productRows[0],
       selectorSelections: { ...selections }
     };
+  }
+
+  function getProductGalleryImages(productRows) {
+    const imagesByUrl = new Map();
+    productRows.forEach((row) => {
+      (Array.isArray(row.galleryImages) ? row.galleryImages : []).forEach((image) => {
+        if (image?.url && !imagesByUrl.has(image.url)) imagesByUrl.set(image.url, image);
+      });
+    });
+    return Array.from(imagesByUrl.values());
   }
 
   function getFirstRowValueForColumns(rows, columns) {
@@ -4132,6 +4219,7 @@
           <div class="muted">${escapeHtml(product.rolls.map(formatRollLabel).join(" | "))}</div>
           ${renderProductLongevity(product)}
           ${renderProductMountingSurfaces(product)}
+          ${renderProductGalleryControl(product)}
           ${renderProductSpecSheetLinks(product)}
           ${renderProductGeneralInfo(product)}
           ${renderProductSurfaceInfo(product)}
@@ -4280,6 +4368,69 @@
         `).join("")}
       </div>
     `;
+  }
+
+  function renderProductGalleryControl(product) {
+    const count = Array.isArray(product.galleryImages) ? product.galleryImages.length : 0;
+    if (!count) return "";
+    return `
+      <div class="product-gallery-control">
+        <button class="product-gallery-trigger" type="button" data-product-gallery-open="true" aria-haspopup="dialog">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 15l4-4 4 4 2-2 6 6M15.5 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg>
+          <span>View photos (${count})</span>
+        </button>
+      </div>
+    `;
+  }
+
+  function openProductGallery(product) {
+    const images = Array.isArray(product?.galleryImages) ? product.galleryImages.filter((image) => image?.url) : [];
+    if (!images.length || !ui.productGallery) return;
+    state.productGalleryImages = images;
+    state.productGalleryIndex = 0;
+    ui.productGalleryTitle.textContent = product?.name || "Product photos";
+    renderProductGallery();
+    ui.productGallery.showModal();
+    ui.productGalleryClose?.focus();
+  }
+
+  function closeProductGallery() {
+    if (ui.productGallery?.open) ui.productGallery.close();
+  }
+
+  function moveProductGallery(offset) {
+    const count = state.productGalleryImages.length;
+    if (!count) return;
+    setProductGalleryIndex((state.productGalleryIndex + offset + count) % count);
+  }
+
+  function setProductGalleryIndex(index) {
+    const count = state.productGalleryImages.length;
+    if (!count || !Number.isInteger(index)) return;
+    state.productGalleryIndex = Math.max(0, Math.min(index, count - 1));
+    renderProductGallery();
+  }
+
+  function renderProductGallery() {
+    const images = state.productGalleryImages;
+    const image = images[state.productGalleryIndex];
+    if (!image || !ui.productGalleryImage) return;
+    const fallbackAlt = `${ui.productGalleryTitle?.textContent || "Product"} photo ${state.productGalleryIndex + 1}`;
+    ui.productGalleryImage.src = image.url;
+    ui.productGalleryImage.alt = image.alternativeText || image.caption || fallbackAlt;
+    ui.productGalleryCaption.textContent = image.caption || image.alternativeText || "";
+    ui.productGalleryCaption.hidden = !ui.productGalleryCaption.textContent;
+    ui.productGalleryCounter.textContent = `${state.productGalleryIndex + 1} of ${images.length}`;
+    const hasMultipleImages = images.length > 1;
+    ui.productGalleryPrevious.hidden = !hasMultipleImages;
+    ui.productGalleryNext.hidden = !hasMultipleImages;
+    ui.productGalleryThumbnails.hidden = !hasMultipleImages;
+    ui.productGalleryThumbnails.innerHTML = hasMultipleImages ? images.map((item, index) => `
+      <button class="product-gallery-thumbnail${index === state.productGalleryIndex ? " selected" : ""}" type="button" data-gallery-index="${index}" aria-label="View photo ${index + 1}" aria-current="${index === state.productGalleryIndex ? "true" : "false"}">
+        <img src="${escapeHtml(item.thumbnailUrl || item.url)}" alt="" loading="lazy">
+      </button>
+    `).join("") : "";
+    ui.productGalleryThumbnails.querySelector("[aria-current='true']")?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
   function renderPdfIcon() {
