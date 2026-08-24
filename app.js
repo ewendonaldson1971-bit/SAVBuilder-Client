@@ -577,6 +577,20 @@
       invalidateAuthoritativeQuoteForEdit();
     });
 
+    ui.elementRowsBody.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.repeat || event.isComposing) return;
+      const shortname = event.target.closest("[data-element-field='shortname']");
+      const row = shortname?.closest("tr");
+      if (!row || row !== ui.elementRowsBody.lastElementChild) return;
+
+      event.preventDefault();
+      appendElementTableRow();
+      syncJobInputFromElementTable();
+      ui.elementRowsBody.lastElementChild
+        ?.querySelector("[data-element-field='quantity']")
+        ?.focus();
+    });
+
     ui.elementRowsBody.addEventListener("focusout", (event) => {
       const field = event.target.closest("[data-element-field]");
       if (!field) return;

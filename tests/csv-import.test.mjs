@@ -22,6 +22,10 @@ test("recalculates after leaving a row and blocks incomplete rows from pricing",
   assert.doesNotMatch(app, /const rowNumber = index \+ firstDataRow \+ 1;/);
 });
 
+test("pressing Enter in the last Shortname adds a row and focuses its Quantity", () => {
+  assert.match(app, /ui\.elementRowsBody\.addEventListener\("keydown",[\s\S]*?event\.key !== "Enter"[\s\S]*?data-element-field='shortname'[\s\S]*?row !== ui\.elementRowsBody\.lastElementChild[\s\S]*?appendElementTableRow\(\);[\s\S]*?data-element-field='quantity'[\s\S]*?\.focus\(\);/);
+});
+
 test("imports CSV from a file or pasted text through a focused dialog", () => {
   assert.match(html, /id="element-csv-dialog"/);
   assert.match(html, /id="element-csv-file"[^>]*accept="\.csv,text\/csv,text\/plain"/);
