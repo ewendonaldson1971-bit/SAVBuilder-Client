@@ -12,6 +12,14 @@ test("keeps the data-entry table visible and offers CSV as a secondary action", 
   assert.doesNotMatch(html, /class="entry-mode"/);
 });
 
+test("recalculates after leaving an entry row and ignores incomplete draft rows", () => {
+  assert.match(app, /ui\.elementRowsBody\.addEventListener\("input",[\s\S]*?syncJobInputFromElementTable\(\);\s*\}\);/);
+  assert.match(app, /ui\.elementRowsBody\.addEventListener\("focusout",[\s\S]*?nextField\.closest\("tr"\) === field\.closest\("tr"\)[\s\S]*?recalculate\(\);/);
+  assert.match(app, /const rowNumber = index \+ 1;/);
+  assert.match(app, /if \(!\[quantity, width, height\]\.every\(\(value\) => String\(value \|\| ""\)\.trim\(\)\)\) return;/);
+  assert.doesNotMatch(app, /const rowNumber = index \+ firstDataRow \+ 1;/);
+});
+
 test("imports CSV from a file or pasted text through a focused dialog", () => {
   assert.match(html, /id="element-csv-dialog"/);
   assert.match(html, /id="element-csv-file"[^>]*accept="\.csv,text\/csv,text\/plain"/);

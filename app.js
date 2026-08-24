@@ -198,7 +198,6 @@
   };
 
   const ui = {};
-  let recalcTimer = 0;
   let recommendationPanelFrame = 0;
   let recommendationPanelResizeObserver = null;
   let pdfjsPromise = null;
@@ -575,7 +574,14 @@
     ui.elementRowsBody.addEventListener("input", (event) => {
       if (!event.target.closest("[data-element-field]")) return;
       syncJobInputFromElementTable();
-      scheduleRecalculate();
+    });
+
+    ui.elementRowsBody.addEventListener("focusout", (event) => {
+      const field = event.target.closest("[data-element-field]");
+      if (!field) return;
+      const nextField = event.relatedTarget?.closest?.("[data-element-field]");
+      if (nextField && nextField.closest("tr") === field.closest("tr")) return;
+      recalculate();
     });
 
     ui.elementTablePanel.addEventListener("paste", handleElementTablePaste);
@@ -982,11 +988,6 @@
     if (state.currentBest) {
       renderImposition(state.currentBest);
     }
-  }
-
-  function scheduleRecalculate() {
-    window.clearTimeout(recalcTimer);
-    recalcTimer = window.setTimeout(recalculate, 130);
   }
 
   function openElementCsvDialog() {
@@ -3492,9 +3493,10 @@
     }
 
     rows.slice(firstDataRow).forEach((row, index) => {
-      const rowNumber = index + firstDataRow + 1;
+      const rowNumber = index + 1;
       if (!row.some((cell) => String(cell).trim())) return;
       const [shortname, quantity, width, height] = row;
+      if (![quantity, width, height].every((value) => String(value || "").trim())) return;
       const element = {
         shortname: String(shortname || `Element ${rowNumber}`).trim(),
         quantity: Math.max(0, Math.floor(cleanNumber(quantity, NaN))),
