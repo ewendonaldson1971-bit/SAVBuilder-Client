@@ -2150,7 +2150,7 @@
 
   function renderProductSearch() {
     const query = state.productSearchQuery.trim();
-    if (ui.filtersPanel) ui.filtersPanel.hidden = Boolean(query);
+    if (ui.filtersPanel) ui.filtersPanel.hidden = Boolean(query || state.productSearchSelection);
     if (ui.productSearch.value !== state.productSearchQuery) {
       ui.productSearch.value = state.productSearchQuery;
     }
