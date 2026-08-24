@@ -2950,14 +2950,14 @@ th,
 
 .element-entry-table th:nth-child(1),
 .element-entry-table td:nth-child(1) {
-  width: 64px;
+  width: 84px;
 }
 
 .element-entry-table th:nth-child(2),
 .element-entry-table td:nth-child(2),
 .element-entry-table th:nth-child(3),
 .element-entry-table td:nth-child(3) {
-  width: 84px;
+  width: 110px;
 }
 
 .element-entry-table th:nth-child(4),
