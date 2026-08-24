@@ -261,6 +261,7 @@
     ui.addElementRow = document.getElementById("add-element-row");
     ui.jobInput = document.getElementById("job-input");
     ui.importElementCsv = document.getElementById("import-element-csv");
+    ui.clearElements = document.getElementById("clear-elements");
     ui.elementCsvDialog = document.getElementById("element-csv-dialog");
     ui.elementCsvFile = document.getElementById("element-csv-file");
     ui.elementCsvClose = document.getElementById("element-csv-close");
@@ -565,6 +566,15 @@
       state.useOffsetJoins = null;
       state.offsetPromptDismissed = false;
       recalculate();
+    });
+
+    ui.clearElements.addEventListener("click", () => {
+      ui.jobInput.value = "";
+      renderElementTableFromText();
+      state.useOffsetJoins = null;
+      state.offsetPromptDismissed = false;
+      recalculate();
+      ui.elementRowsBody.querySelector("[data-element-field='quantity']")?.focus();
     });
 
     ui.elementRowsBody.addEventListener("input", (event) => {

@@ -21,3 +21,8 @@ test("imports CSV from a file or pasted text through a focused dialog", () => {
   assert.match(app, /function importElementCsvRows\(\)/);
   assert.match(app, /renderElementTableFromText\(\)/);
 });
+
+test("offers a clear action that resets the data-entry table", () => {
+  assert.match(html, /id="clear-elements"[^>]*>Clear<\/button>/);
+  assert.match(app, /ui\.clearElements\.addEventListener\("click", \(\) => \{[\s\S]*?ui\.jobInput\.value = "";[\s\S]*?renderElementTableFromText\(\);[\s\S]*?recalculate\(\);/);
+});
