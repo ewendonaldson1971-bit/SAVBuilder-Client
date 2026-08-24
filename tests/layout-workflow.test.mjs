@@ -60,6 +60,15 @@ test("uses the Opti-Clear property label", () => {
   assert.doesNotMatch(app, /label: "Optically Clear"/);
 });
 
+test("fits the natural desktop workspace using progressive disclosure", () => {
+  assert.match(html, /<details class="filters-panel"/);
+  assert.match(html, /id="filters-config-status" class="advanced-config-status">Choose a class/);
+  assert.match(css, /@media \(min-width: 981px\)[\s\S]*?\.configurator-progress,[\s\S]*?\.configurator-guidance,[\s\S]*?\.survey-empty\.neutral\s*\{\s*display: none;/);
+  assert.match(css, /\.imposition-panel \.preview-stage\s*\{[\s\S]*?height: clamp\(108px, calc\(100vh - 612px\), 240px\);[\s\S]*?min-height: 0;/);
+  assert.match(css, /\.filters-panel\[open\] \.filters-panel-body\s*\{[\s\S]*?position: absolute;[\s\S]*?max-height: calc\(100vh - var\(--sticky-header-height\) - 220px\);/);
+  assert.match(app, /function renderFilterStatus\(\)/);
+});
+
 test("starts and resets with every class filter unselected", () => {
   assert.match(app, /classFilters: new Set\(\)/);
   assert.equal((app.match(/state\.classFilters = new Set\(\);/g) || []).length, 2);
