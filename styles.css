@@ -375,15 +375,21 @@ h2 {
 }
 
 .product-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
   margin-bottom: 14px;
 }
 
 .product-search-field {
-  margin-bottom: 8px;
+  min-width: 0;
+  margin-bottom: 0;
 }
 
 .product-search-results {
   display: grid;
+  grid-column: 1 / -1;
   gap: 7px;
 }
 
@@ -426,12 +432,6 @@ h2 {
   border-radius: 7px;
   background: #f7fbff;
   font-weight: 700;
-}
-
-.setup-reset-row {
-  display: flex;
-  justify-content: flex-end;
-  margin: 0 0 14px;
 }
 
 .ghost-button.setup-reset-button {

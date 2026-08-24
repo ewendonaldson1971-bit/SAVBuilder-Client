@@ -38,6 +38,13 @@ test("places artwork controls behind the same disclosure pattern as Advanced Opt
   assert.match(app, /function renderArtworkConfigStatus\(\)/);
 });
 
+test("aligns the compact Reset action with Product search", () => {
+  assert.match(html, /<div class="product-search">[\s\S]*?id="product-search"[\s\S]*?id="reset-survey"[\s\S]*?id="product-search-results"/);
+  assert.doesNotMatch(html, /class="setup-reset-row"/);
+  assert.match(css, /\.product-search\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) auto;[\s\S]*?align-items: end;/);
+  assert.match(css, /\.product-search-results\s*\{[\s\S]*?grid-column: 1 \/ -1;/);
+});
+
 test("starts and resets with every class filter unselected", () => {
   assert.match(app, /classFilters: new Set\(\)/);
   assert.equal((app.match(/state\.classFilters = new Set\(\);/g) || []).length, 2);
