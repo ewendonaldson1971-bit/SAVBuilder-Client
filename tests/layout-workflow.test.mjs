@@ -55,6 +55,11 @@ test("uses the concise Repositionable property label", () => {
   assert.doesNotMatch(app, /label: "Repositionable on Install"/);
 });
 
+test("uses the Opti-Clear property label", () => {
+  assert.match(app, /id: "optically-clear", label: "Opti-Clear"/);
+  assert.doesNotMatch(app, /label: "Optically Clear"/);
+});
+
 test("starts and resets with every class filter unselected", () => {
   assert.match(app, /classFilters: new Set\(\)/);
   assert.equal((app.match(/state\.classFilters = new Set\(\);/g) || []).length, 2);

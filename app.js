@@ -59,7 +59,7 @@
     { id: "greyback", label: "Greyback", columns: ["Greyback", "Grey back", "Grayback", "Gray back"] },
     { id: "translucent", label: "Translucent", columns: ["Translucent"] },
     { id: "clear", label: "Clear", columns: ["Clear"] },
-    { id: "optically-clear", label: "Optically Clear", columns: ["Optically Clear"] },
+    { id: "optically-clear", label: "Opti-Clear", columns: ["Optically Clear"] },
     { id: "perforated", label: "Perforated", columns: ["Perforated", "Perforated (One way Vision)", "Perforated (One Way Vision)"] },
     { id: "reflective", label: "Reflective", columns: ["Reflective"] },
     { id: "specialty", label: "Specialty", columns: ["Specialty"] },
