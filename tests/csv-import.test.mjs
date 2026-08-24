@@ -7,9 +7,15 @@ const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
 
 test("keeps the data-entry table visible and offers CSV as a secondary action", () => {
   assert.match(html, /id="import-element-csv"[^>]*>Import CSV<\/button>/);
+  assert.match(html, /id="export-element-csv"[^>]*>Export CSV<\/button>/);
   assert.match(html, /id="element-table-panel" class="element-table-panel"/);
   assert.doesNotMatch(html, /name="element-entry-mode"/);
   assert.doesNotMatch(html, /class="entry-mode"/);
+});
+
+test("exports the current table as an import-compatible CSV file", () => {
+  assert.match(app, /ui\.exportElementCsv\.addEventListener\("click", exportElementCsv\)/);
+  assert.match(app, /function exportElementCsv\(\)[\s\S]*?Shortname,Quantity,Width,Height[\s\S]*?sav-builder-data\.csv[\s\S]*?URL\.revokeObjectURL/);
 });
 
 test("recalculates after leaving a row and blocks incomplete rows from pricing", () => {

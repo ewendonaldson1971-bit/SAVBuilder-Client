@@ -259,6 +259,7 @@
     ui.addElementRow = document.getElementById("add-element-row");
     ui.jobInput = document.getElementById("job-input");
     ui.importElementCsv = document.getElementById("import-element-csv");
+    ui.exportElementCsv = document.getElementById("export-element-csv");
     ui.clearElements = document.getElementById("clear-elements");
     ui.elementCsvDialog = document.getElementById("element-csv-dialog");
     ui.elementCsvFile = document.getElementById("element-csv-file");
@@ -549,6 +550,7 @@
     });
 
     ui.importElementCsv.addEventListener("click", openElementCsvDialog);
+    ui.exportElementCsv.addEventListener("click", exportElementCsv);
     ui.elementCsvClose.addEventListener("click", closeElementCsvDialog);
     ui.elementCsvCancel.addEventListener("click", closeElementCsvDialog);
     ui.elementCsvConfirm.addEventListener("click", importElementCsvRows);
@@ -1124,6 +1126,26 @@
       width: row.querySelector("[data-element-field='width']")?.value || "",
       height: row.querySelector("[data-element-field='height']")?.value || ""
     }));
+  }
+
+  function exportElementCsv() {
+    const rows = getElementTableRows()
+      .filter((row) => Object.values(row).some((value) => String(value).trim()));
+    const lines = [
+      "Shortname,Quantity,Width,Height",
+      ...rows.map((row) => [row.shortname, row.quantity, row.width, row.height]
+        .map(formatCsvCell)
+        .join(","))
+    ];
+    const blob = new Blob([`\uFEFF${lines.join("\r\n")}\r\n`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "sav-builder-data.csv";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function handleElementTablePaste(event) {
@@ -5282,13 +5304,14 @@
       const artworkMarkup = artwork
         ? buildArtworkMarkup(placement, artwork, clipId, x, y, width, height, scale)
         : "";
+      const placementColor = getPlacementColor(placement);
       const labelPlate = canLabel && artwork
         ? `<rect x="${x + 4}" y="${y + 4}" width="${Math.min(width - 8, Math.max(76, label.length * 7))}" height="18" rx="3" fill="#17201c" opacity="0.64"/>`
         : "";
 
       return `
         <g>
-          <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="3" fill="${placement.color}" opacity="0.86"/>
+          <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="3" fill="${placementColor}" opacity="0.86"/>
           ${artworkMarkup}
           <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="3" fill="none" stroke="#17201c" stroke-opacity="0.35" stroke-width="1"/>
           ${overlapLine}
@@ -5318,6 +5341,14 @@
         ${truncatedNote}
       </svg>
     `;
+  }
+
+  function getPlacementColor(placement) {
+    if (placement?.color) return placement.color;
+    const elementIndex = Number.isInteger(Number(placement?.elementIndex))
+      ? Math.max(0, Number(placement.elementIndex))
+      : 0;
+    return COLORS[elementIndex % COLORS.length];
   }
 
   function getArtworkByElementIndex(best) {
