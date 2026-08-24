@@ -240,7 +240,6 @@
     ui.advancedConfigStatus = document.getElementById("advanced-config-status");
     ui.productSearchPanel = document.querySelector(".product-search");
     ui.filtersPanel = document.querySelector(".filters-panel");
-    ui.filtersConfigStatus = document.getElementById("filters-config-status");
     ui.brandSelector = document.getElementById("brand-selector");
     ui.classSelector = document.getElementById("class-selector");
     ui.limitSelector = document.getElementById("limit-selector");
@@ -1793,7 +1792,6 @@
     renderSelectorSurvey(selectorState);
     renderConfiguratorProgress(selectorState, parsed.elements);
     renderAdvancedConfigStatus();
-    renderFilterStatus();
 
     if (!parsed.elements.length) {
       state.currentBest = null;
@@ -2527,18 +2525,6 @@
     ui.advancedConfigStatus.textContent = custom ? "Custom" : "Defaults";
     ui.advancedConfigStatus.classList.toggle("custom", custom);
     syncOffsetChoiceButtons();
-  }
-
-  function renderFilterStatus() {
-    if (!ui.filtersConfigStatus) return;
-    if (!state.classFilters.size) {
-      ui.filtersConfigStatus.textContent = "Choose a class";
-      ui.filtersConfigStatus.classList.remove("custom");
-      return;
-    }
-    const count = getActiveFilterCount();
-    ui.filtersConfigStatus.textContent = count ? `${count} active` : "Defaults";
-    ui.filtersConfigStatus.classList.toggle("custom", count > 0);
   }
 
   function isSyntheticSelectorColumn(column) {
