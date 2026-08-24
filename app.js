@@ -593,11 +593,8 @@
         ?.focus();
     });
 
-    ui.elementRowsBody.addEventListener("focusout", (event) => {
-      const field = event.target.closest("[data-element-field]");
-      if (!field) return;
-      const nextField = event.relatedTarget?.closest?.("[data-element-field]");
-      if (nextField && nextField.closest("tr") === field.closest("tr")) return;
+    ui.elementRowsBody.addEventListener("change", (event) => {
+      if (!event.target.closest("[data-element-field]")) return;
       recalculate();
     });
 

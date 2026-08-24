@@ -18,9 +18,10 @@ test("exports the current table as an import-compatible CSV file", () => {
   assert.match(app, /function exportElementCsv\(\)[\s\S]*?Shortname,Quantity,Width,Height[\s\S]*?sav-builder-data\.csv[\s\S]*?URL\.revokeObjectURL/);
 });
 
-test("recalculates after leaving a row and blocks incomplete rows from pricing", () => {
+test("recalculates after committing a field and blocks incomplete rows from pricing", () => {
   assert.match(app, /ui\.elementRowsBody\.addEventListener\("input",[\s\S]*?syncJobInputFromElementTable\(\);[\s\S]*?invalidateAuthoritativeQuoteForEdit\(\);\s*\}\);/);
-  assert.match(app, /ui\.elementRowsBody\.addEventListener\("focusout",[\s\S]*?nextField\.closest\("tr"\) === field\.closest\("tr"\)[\s\S]*?recalculate\(\);/);
+  assert.match(app, /ui\.elementRowsBody\.addEventListener\("change",[\s\S]*?data-element-field[\s\S]*?recalculate\(\);/);
+  assert.doesNotMatch(app, /ui\.elementRowsBody\.addEventListener\("input", \(event\) => \{[^}]*recalculate\(\);/);
   assert.match(app, /function invalidateAuthoritativeQuoteForEdit\(\) \{[\s\S]*?state\.pricingQuoteRequestId \+= 1;[\s\S]*?state\.authoritativeQuoteReady = false;[\s\S]*?syncCartButtons\(\);[\s\S]*?setImpositionActionButtonsDisabled\(true\);/);
   assert.match(app, /const rowNumber = index \+ 1;/);
   assert.doesNotMatch(app, /if \(!\[quantity, width, height\]\.every\(\(value\) => String\(value \|\| ""\)\.trim\(\)\)\) return;/);
