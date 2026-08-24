@@ -45,6 +45,7 @@
     <div id="app-toast" class="app-toast" role="status" aria-live="polite" hidden></div>
 
     <main class="app-shell">
+      <div class="workflow-column input-workflow" aria-label="Configure SAV job">
       <section class="setup-panel surface" aria-labelledby="setup-title">
         <div class="section-heading">
           <div class="heading-title">
@@ -220,6 +221,10 @@
         <div id="artwork-fit-warning" class="artwork-fit-warning" hidden></div>
       </section>
 
+      </div>
+
+      <div class="workflow-column output-workflow" aria-label="Review SAV pricing and imposition">
+
       <section class="results-panel surface" aria-label="Result">
         <div id="offset-prompt" class="offset-prompt hidden"></div>
         <div class="breakdown" id="cost-breakdown" aria-label="Cost breakdown"></div>
@@ -306,6 +311,7 @@
         </div>
         <div id="imposition-preview" class="preview-stage"></div>
       </section>
+      </div>
     </main>
 
     <dialog id="product-gallery" class="product-gallery-dialog" aria-labelledby="product-gallery-title">

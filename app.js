@@ -172,7 +172,7 @@
     selectorSelections: {},
     brandFilter: "all",
     brandOptions: FALLBACK_BRAND_OPTIONS.map((option) => ({ ...option })),
-    classFilters: new Set(CLASS_OPTIONS.slice(1).map((option) => option.id)),
+    classFilters: new Set(),
     limitFilters: new Set(),
     mountingSurfaceFilter: MOUNTING_SURFACE_ALL,
     selectedProduct: null,
@@ -698,7 +698,7 @@
   function resetSurveyAndFilters() {
     state.selectorSelections = {};
     state.brandFilter = "all";
-    state.classFilters = new Set(getSelectableClassOptions().map((option) => option.id));
+    state.classFilters = new Set();
     state.limitFilters.clear();
     state.mountingSurfaceFilter = MOUNTING_SURFACE_ALL;
     state.productSearchSelection = null;
@@ -713,7 +713,7 @@
 
   function clearSelectorFilters() {
     state.brandFilter = "all";
-    state.classFilters = new Set(getSelectableClassOptions().map((option) => option.id));
+    state.classFilters = new Set();
     state.limitFilters.clear();
     state.mountingSurfaceFilter = MOUNTING_SURFACE_ALL;
     state.productSearchSelection = null;
