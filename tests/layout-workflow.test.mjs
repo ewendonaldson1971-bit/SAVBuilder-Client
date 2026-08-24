@@ -24,3 +24,11 @@ test("starts and resets with every class filter unselected", () => {
   assert.match(app, /classFilters: new Set\(\)/);
   assert.equal((app.match(/state\.classFilters = new Set\(\);/g) || []).length, 2);
 });
+
+test("treats the initial empty class selection as neutral guidance", () => {
+  assert.match(app, /title = "Choose a class"/);
+  assert.match(app, /Choose a class to see matching SAV products\./);
+  assert.match(app, /survey-empty\$\{awaitingClassSelection \? " neutral" : ""\}/);
+  assert.match(css, /\.survey-empty\.neutral\s*\{/);
+  assert.match(css, /\.survey-empty:not\(\.neutral\)/);
+});

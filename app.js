@@ -2429,6 +2429,10 @@
       body = "The selector is waiting for the published Strapi catalogue.";
       status = "pending";
       disabled = true;
+    } else if (!state.classFilters.size) {
+      title = "Choose a class";
+      body = "Select one or more Class options to see matching SAV products.";
+      target = "filters";
     } else if (!selectorState.candidates.length) {
       title = "No results found";
       body = "Clear filters or broaden the selection to see matching SAV products.";
@@ -2469,7 +2473,7 @@
     return [
       state.mountingSurfaceFilter !== MOUNTING_SURFACE_ALL,
       state.brandFilter !== "all",
-      state.classFilters.size !== getSelectableClassOptions().length,
+      state.classFilters.size > 0 && state.classFilters.size !== getSelectableClassOptions().length,
       state.limitFilters.size > 0
     ].filter(Boolean).length;
   }
@@ -4259,11 +4263,13 @@
   }
 
   function renderSelectorEmptyState(selectorState) {
+    const awaitingClassSelection = !state.classFilters.size;
     const showClearFilters = selectorState.hasRows &&
       !selectorState.candidates.length &&
+      !awaitingClassSelection &&
       hasActiveSelectorFilters();
     return `
-      <div class="survey-empty">
+      <div class="survey-empty${awaitingClassSelection ? " neutral" : ""}">
         <span>${escapeHtml(getSelectorEmptyMessage(selectorState))}</span>
         ${showClearFilters ? `<button class="ghost-button compact" type="button" data-selector-clear-filters="true">Clear filters</button>` : ""}
       </div>
@@ -4732,6 +4738,7 @@
 
   function getSelectorEmptyMessage(selectorState) {
     if (!selectorState.hasRows) return "No selector data loaded.";
+    if (!state.classFilters.size) return "Choose a class to see matching SAV products.";
     if (!selectorState.candidates.length) return "No results found for this selection";
     if (selectorState.question) return "Answer the product survey to select stock.";
     return "No complete product data is available for this selection yet.";
@@ -4740,7 +4747,7 @@
   function hasActiveSelectorFilters() {
     return state.mountingSurfaceFilter !== MOUNTING_SURFACE_ALL ||
       state.brandFilter !== "all" ||
-      state.classFilters.size !== getSelectableClassOptions().length ||
+      (state.classFilters.size > 0 && state.classFilters.size !== getSelectableClassOptions().length) ||
       state.limitFilters.size > 0 ||
       Boolean(state.productSearchQuery.trim());
   }
