@@ -166,6 +166,17 @@ h2 {
   gap: 16px;
 }
 
+.output-workflow {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+  max-height: calc(100vh - 32px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 .surface {
   min-width: 0;
   background: var(--surface);
@@ -2218,6 +2229,13 @@ tbody tr.selected-row {
 @media (max-width: 980px) {
   .app-shell {
     grid-template-columns: 1fr;
+  }
+
+  .output-workflow {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    scrollbar-gutter: auto;
   }
 }
 

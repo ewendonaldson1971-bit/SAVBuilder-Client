@@ -20,6 +20,11 @@ test("organizes the SAV workflow into input and output columns", () => {
   assert.match(css, /@media \(max-width: 980px\)[\s\S]*?\.app-shell\s*\{\s*grid-template-columns: 1fr;/);
 });
 
+test("keeps the output workflow visible while desktop users scroll the inputs", () => {
+  assert.match(css, /\.output-workflow\s*\{[\s\S]*?position: sticky;[\s\S]*?top: 16px;[\s\S]*?max-height: calc\(100vh - 32px\);[\s\S]*?overflow-y: auto;/);
+  assert.match(css, /@media \(max-width: 980px\)[\s\S]*?\.output-workflow\s*\{[\s\S]*?position: static;[\s\S]*?max-height: none;[\s\S]*?overflow: visible;/);
+});
+
 test("starts and resets with every class filter unselected", () => {
   assert.match(app, /classFilters: new Set\(\)/);
   assert.equal((app.match(/state\.classFilters = new Set\(\);/g) || []).length, 2);
