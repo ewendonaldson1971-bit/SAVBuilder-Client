@@ -76,3 +76,9 @@ test("treats the initial empty class selection as neutral guidance", () => {
 test("places Mounting Surface immediately after the Class controls", () => {
   assert.match(html, /class="class-filter"[\s\S]*?id="class-selector"[\s\S]*?class="mounting-filter"[\s\S]*?id="mounting-surface-selector"/);
 });
+
+test("shows the default brand once as All brands", () => {
+  assert.match(app, /currentIsAllBrands \? "" : `<span class="brand-option-media">/);
+  assert.match(app, /currentIsAllBrands \? "All brands" : current\.label/);
+  assert.doesNotMatch(css, /\.brand-all-mark/);
+});

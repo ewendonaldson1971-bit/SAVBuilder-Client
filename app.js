@@ -2531,22 +2531,24 @@
     const current = getBrandOption(state.brandFilter);
     const renderLogo = (option) => option.logo
       ? `<img class="brand-option-logo" src="${escapeHtml(option.logo)}" alt="" aria-hidden="true">`
-      : `<span class="brand-all-mark" aria-hidden="true">ALL</span>`;
+      : "";
     const options = state.brandOptions.map((option) => {
       const selected = option.id === state.brandFilter;
+      const isAllBrands = option.id === "all";
       return `
-        <button class="brand-dropdown-option${selected ? " selected" : ""}" type="button" data-brand-filter="${escapeHtml(option.id)}" role="option" aria-selected="${selected ? "true" : "false"}">
-          <span class="brand-option-media">${renderLogo(option)}</span>
-          <span class="brand-option-name">${escapeHtml(option.id === "all" ? "All brands" : option.label)}</span>
+        <button class="brand-dropdown-option${selected ? " selected" : ""}${isAllBrands ? " all-brands" : ""}" type="button" data-brand-filter="${escapeHtml(option.id)}" role="option" aria-selected="${selected ? "true" : "false"}">
+          ${isAllBrands ? "" : `<span class="brand-option-media">${renderLogo(option)}</span>`}
+          <span class="brand-option-name">${escapeHtml(isAllBrands ? "All brands" : option.label)}</span>
           <span class="brand-option-check" aria-hidden="true">✓</span>
         </button>
       `;
     }).join("");
+    const currentIsAllBrands = current.id === "all";
     ui.brandSelector.innerHTML = `
       <details class="brand-dropdown">
-        <summary class="brand-dropdown-trigger" aria-label="Select brand: ${escapeHtml(current.id === "all" ? "All brands" : current.label)}">
-          <span class="brand-option-media">${renderLogo(current)}</span>
-          <span class="brand-option-name">${escapeHtml(current.id === "all" ? "All brands" : current.label)}</span>
+        <summary class="brand-dropdown-trigger${currentIsAllBrands ? " all-brands" : ""}" aria-label="Select brand: ${escapeHtml(currentIsAllBrands ? "All brands" : current.label)}">
+          ${currentIsAllBrands ? "" : `<span class="brand-option-media">${renderLogo(current)}</span>`}
+          <span class="brand-option-name">${escapeHtml(currentIsAllBrands ? "All brands" : current.label)}</span>
           <span class="brand-dropdown-chevron" aria-hidden="true"></span>
         </summary>
         <div class="brand-dropdown-menu" role="listbox" aria-label="Brands">
