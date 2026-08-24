@@ -53,7 +53,7 @@
   const LIMIT_FILTER_OPTIONS = [
     { id: "white", label: "White", columns: ["White"] },
     { id: "air-release", label: "Air Release", columns: ["Air Release"] },
-    { id: "repositionable", label: "Repositionable on Install", columns: ["Repositionable on Install", "Repositionable on Installation", "Repositionable"] },
+    { id: "repositionable", label: "Repositionable", columns: ["Repositionable on Install", "Repositionable on Installation", "Repositionable"] },
     { id: "removable", label: "Removable", columns: ["Removable"] },
     { id: "high-tac", label: "High-tac", columns: ["High-tac", "High tac", "High tack"] },
     { id: "greyback", label: "Greyback", columns: ["Greyback", "Grey back", "Grayback", "Gray back"] },
