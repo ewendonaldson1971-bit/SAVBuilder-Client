@@ -782,10 +782,6 @@ h2 {
   gap: 7px;
 }
 
-.class-selector .class-button:first-child {
-  grid-column: 1 / -1;
-}
-
 .brand-selector {
   position: relative;
 }

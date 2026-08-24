@@ -44,7 +44,6 @@
   const CLASS_COLUMN = "Class";
   const CLASS_COLUMN_CANDIDATES = ["Class", "Product Class", "Material Class", "Vinyl Class"];
   const CLASS_OPTIONS = [
-    { id: "all", label: "All", matches: [] },
     { id: "monomeric", label: "Monomeric (Good)", matches: ["Monomeric", "Mono"] },
     { id: "intermediate-polymeric", label: "Intermediate Polymeric (Better)", matches: ["Intermediate Polymeric"], matchMode: "prefix" },
     { id: "premium-polymeric", label: "Premium Polymeric (Better still)", matches: ["Premium Polymeric"], matchMode: "prefix" },
@@ -428,11 +427,7 @@
       if (!button) return;
       const classFilter = button.dataset.classFilter;
       if (!getClassOption(classFilter, false)) return;
-      if (classFilter === "all") {
-        const selectableClassIds = getSelectableClassOptions().map((option) => option.id);
-        const allSelected = selectableClassIds.every((id) => state.classFilters.has(id));
-        state.classFilters = allSelected ? new Set() : new Set(selectableClassIds);
-      } else if (state.classFilters.has(classFilter)) {
+      if (state.classFilters.has(classFilter)) {
         state.classFilters.delete(classFilter);
       } else {
         state.classFilters.add(classFilter);
@@ -2563,9 +2558,8 @@
 
   function renderClassSelector() {
     if (!ui.classSelector) return;
-    const allSelected = state.classFilters.size === getSelectableClassOptions().length;
     ui.classSelector.innerHTML = CLASS_OPTIONS.map((option) => {
-      const selected = option.id === "all" ? allSelected : state.classFilters.has(option.id);
+      const selected = state.classFilters.has(option.id);
       return `
         <button class="class-button${selected ? " selected" : ""}" type="button" data-class-filter="${escapeHtml(option.id)}" aria-pressed="${selected ? "true" : "false"}">
           <span>${escapeHtml(option.label)}</span>
@@ -2703,7 +2697,7 @@
   }
 
   function getSelectableClassOptions() {
-    return CLASS_OPTIONS.filter((option) => option.id !== "all");
+    return CLASS_OPTIONS;
   }
 
   function getLimitFilterOption(id) {

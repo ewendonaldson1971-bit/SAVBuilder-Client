@@ -72,3 +72,7 @@ test("treats the initial empty class selection as neutral guidance", () => {
   assert.match(css, /\.survey-empty\.neutral\s*\{/);
   assert.match(css, /\.survey-empty:not\(\.neutral\)/);
 });
+
+test("places Mounting Surface immediately after the Class controls", () => {
+  assert.match(html, /class="class-filter"[\s\S]*?id="class-selector"[\s\S]*?class="mounting-filter"[\s\S]*?id="mounting-surface-selector"/);
+});
