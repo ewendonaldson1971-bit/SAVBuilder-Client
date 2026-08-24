@@ -574,6 +574,7 @@
     ui.elementRowsBody.addEventListener("input", (event) => {
       if (!event.target.closest("[data-element-field]")) return;
       syncJobInputFromElementTable();
+      invalidateAuthoritativeQuoteForEdit();
     });
 
     ui.elementRowsBody.addEventListener("focusout", (event) => {
@@ -988,6 +989,15 @@
     if (state.currentBest) {
       renderImposition(state.currentBest);
     }
+  }
+
+  function invalidateAuthoritativeQuoteForEdit() {
+    state.pricingQuoteRequestId += 1;
+    state.currentCartRequest = null;
+    state.authoritativeQuoteReady = false;
+    syncCartButtons();
+    setImpositionActionButtonsDisabled(true);
+    renderPricingConnection();
   }
 
   function openElementCsvDialog() {
@@ -1788,6 +1798,15 @@
     renderSelectorSurvey(selectorState);
     renderConfiguratorProgress(selectorState, parsed.elements);
     renderAdvancedConfigStatus();
+
+    if (parsed.errors.length) {
+      state.currentBest = null;
+      state.currentOptions = [];
+      renderConfiguratorGuidance(selectorState, parsed.elements, null);
+      renderArtworkList(parsed.elements);
+      renderEmptyResults();
+      return;
+    }
 
     if (!parsed.elements.length) {
       state.currentBest = null;
@@ -3504,7 +3523,6 @@
       const rowNumber = index + 1;
       if (!row.some((cell) => String(cell).trim())) return;
       const [shortname, quantity, width, height] = row;
-      if (![quantity, width, height].every((value) => String(value || "").trim())) return;
       const element = {
         shortname: String(shortname || `Element ${rowNumber}`).trim(),
         quantity: Math.max(0, Math.floor(cleanNumber(quantity, NaN))),
