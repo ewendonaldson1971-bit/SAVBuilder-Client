@@ -21,8 +21,13 @@ test("organizes the SAV workflow into input and output columns", () => {
 });
 
 test("keeps the output workflow visible while desktop users scroll the inputs", () => {
-  assert.match(css, /\.output-workflow\s*\{[\s\S]*?position: sticky;[\s\S]*?top: 16px;[\s\S]*?max-height: calc\(100vh - 32px\);[\s\S]*?overflow-y: auto;/);
+  assert.match(css, /\.output-workflow\s*\{[\s\S]*?position: sticky;[\s\S]*?top: calc\(var\(--sticky-header-height\) \+ 16px\);[\s\S]*?max-height: calc\(100vh - var\(--sticky-header-height\) - 32px\);[\s\S]*?overflow-y: auto;/);
   assert.match(css, /@media \(max-width: 980px\)[\s\S]*?\.output-workflow\s*\{[\s\S]*?position: static;[\s\S]*?max-height: none;[\s\S]*?overflow: visible;/);
+});
+
+test("keeps the Vivad header visible while the page scrolls", () => {
+  assert.match(css, /\.app-header\s*\{\s*position: sticky;\s*top: 0;\s*z-index: 60;/);
+  assert.match(css, /--sticky-header-height: 112px;/);
 });
 
 test("starts and resets with every class filter unselected", () => {

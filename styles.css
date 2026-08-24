@@ -35,6 +35,7 @@
   --shadow: 0 14px 34px rgba(83, 86, 90, 0.12);
   --recommendation-panel-space: 128px;
   --recommendation-panel-offset: clamp(6px, 1.2vw, 12px);
+  --sticky-header-height: 112px;
 }
 
 * {
@@ -63,6 +64,9 @@ textarea {
 }
 
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 60;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -168,9 +172,9 @@ h2 {
 
 .output-workflow {
   position: sticky;
-  top: 16px;
+  top: calc(var(--sticky-header-height) + 16px);
   align-self: start;
-  max-height: calc(100vh - 32px);
+  max-height: calc(100vh - var(--sticky-header-height) - 32px);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
