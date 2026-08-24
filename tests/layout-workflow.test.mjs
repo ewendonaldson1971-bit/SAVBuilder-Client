@@ -73,8 +73,8 @@ test("does not show an empty-state pill before a class is selected", () => {
   assert.doesNotMatch(css, /\.survey-empty\.neutral/);
 });
 
-test("places Mounting Surface immediately after the Class controls", () => {
-  assert.match(html, /class="class-filter"[\s\S]*?id="class-selector"[\s\S]*?class="mounting-filter"[\s\S]*?id="mounting-surface-selector"/);
+test("orders Class above Brand and Mounting Surface", () => {
+  assert.match(html, /class="class-filter"[\s\S]*?id="class-selector"[\s\S]*?class="brand-filter"[\s\S]*?id="brand-selector"[\s\S]*?class="mounting-filter"[\s\S]*?id="mounting-surface-selector"/);
 });
 
 test("shows the default brand once as All brands", () => {
