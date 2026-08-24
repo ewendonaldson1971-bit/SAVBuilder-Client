@@ -50,12 +50,23 @@ test("opens guidance image previews in the controlled product gallery", () => {
   assert.doesNotMatch(app, /<a class="og-preview image-preview"[^>]+target="_blank"/);
 });
 
-test("the All class state includes blank or unrecognised product classes", () => {
+test("selecting every visible class includes blank or unrecognised product classes", () => {
   assert.match(app, /classOptions\.every\(\(option\) => state\.classFilters\.has\(option\.id\)\)\) return true;/);
   assert.match(app, /if \(!state\.classFilters\.size\) return false;/);
 });
 
-test("the All class button toggles every individual class on and off", () => {
-  assert.match(app, /const allSelected = selectableClassIds\.every\(\(id\) => state\.classFilters\.has\(id\)\)/);
-  assert.match(app, /state\.classFilters = allSelected \? new Set\(\) : new Set\(selectableClassIds\)/);
+test("the class selector only renders the individual class controls", () => {
+  const classOptions = app.match(/const CLASS_OPTIONS = \[([\s\S]*?)\n  \];/)?.[1] || "";
+  assert.doesNotMatch(classOptions, /id: "all"/);
+  assert.doesNotMatch(app, /data-class-filter="all"/);
+});
+
+test("product search treats no selected classes as all classes", () => {
+  assert.match(app, /function matchesProductSearchFilters\(row\) \{[\s\S]*?\(!state\.classFilters\.size \|\| matchesSelectedClassOptions\(row\)\)/);
+  assert.match(app, /function getProductSearchResults\(query\)[\s\S]*?if \(!matchesProductSearchFilters\(row\)\) return;/);
+  assert.match(app, /getActiveProductSearchSelectionState\(\)[\s\S]*?row\.isCompleteProduct &&[\s\S]*?matchesProductSearchFilters\(row\)/);
+});
+
+test("product search hides filters while the user is typing", () => {
+  assert.match(app, /function renderProductSearch\(\) \{\s*const query = state\.productSearchQuery\.trim\(\);\s*if \(ui\.filtersPanel\) ui\.filtersPanel\.hidden = Boolean\(query\);/);
 });

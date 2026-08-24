@@ -44,7 +44,6 @@
   const CLASS_COLUMN = "Class";
   const CLASS_COLUMN_CANDIDATES = ["Class", "Product Class", "Material Class", "Vinyl Class"];
   const CLASS_OPTIONS = [
-    { id: "all", label: "All", matches: [] },
     { id: "monomeric", label: "Monomeric (Good)", matches: ["Monomeric", "Mono"] },
     { id: "intermediate-polymeric", label: "Intermediate Polymeric (Better)", matches: ["Intermediate Polymeric"], matchMode: "prefix" },
     { id: "premium-polymeric", label: "Premium Polymeric (Better still)", matches: ["Premium Polymeric"], matchMode: "prefix" },
@@ -53,14 +52,14 @@
   const LIMIT_FILTER_OPTIONS = [
     { id: "white", label: "White", columns: ["White"] },
     { id: "air-release", label: "Air Release", columns: ["Air Release"] },
-    { id: "repositionable", label: "Repositionable on Install", columns: ["Repositionable on Install", "Repositionable on Installation", "Repositionable"] },
+    { id: "repositionable", label: "Repositionable", columns: ["Repositionable on Install", "Repositionable on Installation", "Repositionable"] },
     { id: "removable", label: "Removable", columns: ["Removable"] },
     { id: "high-tac", label: "High-tac", columns: ["High-tac", "High tac", "High tack"] },
     { id: "greyback", label: "Greyback", columns: ["Greyback", "Grey back", "Grayback", "Gray back"] },
     { id: "translucent", label: "Translucent", columns: ["Translucent"] },
     { id: "clear", label: "Clear", columns: ["Clear"] },
     { id: "optically-clear", label: "Optically Clear", columns: ["Optically Clear"] },
-    { id: "perforated", label: "Perforated (One Way Vision)", columns: ["Perforated", "Perforated (One way Vision)", "Perforated (One Way Vision)"] },
+    { id: "perforated", label: "Perforated", columns: ["Perforated", "Perforated (One way Vision)", "Perforated (One Way Vision)"] },
     { id: "reflective", label: "Reflective", columns: ["Reflective"] },
     { id: "specialty", label: "Specialty", columns: ["Specialty"] },
     { id: "black-back", label: "Black back", columns: ["Black back", "Black Back", "Blackback"] }
@@ -172,7 +171,7 @@
     selectorSelections: {},
     brandFilter: "all",
     brandOptions: FALLBACK_BRAND_OPTIONS.map((option) => ({ ...option })),
-    classFilters: new Set(CLASS_OPTIONS.slice(1).map((option) => option.id)),
+    classFilters: new Set(),
     limitFilters: new Set(),
     mountingSurfaceFilter: MOUNTING_SURFACE_ALL,
     selectedProduct: null,
@@ -180,7 +179,6 @@
     productSearchQuery: "",
     productSearchResults: [],
     productSearchSelection: null,
-    elementInputMode: "table",
     productSource: "strapi",
     useOffsetJoins: null,
     offsetPromptDismissed: false,
@@ -200,7 +198,6 @@
   };
 
   const ui = {};
-  let recalcTimer = 0;
   let recommendationPanelFrame = 0;
   let recommendationPanelResizeObserver = null;
   let pdfjsPromise = null;
@@ -256,16 +253,24 @@
     ui.bleedMm = document.getElementById("bleed-mm");
     ui.overlapMm = document.getElementById("overlap-mm");
     ui.advancedOffsetChoices = document.getElementById("advanced-offset-choices");
-    ui.elementModeInputs = Array.from(document.querySelectorAll("input[name='element-entry-mode']"));
-    ui.elementCsvPanel = document.getElementById("element-csv-panel");
     ui.elementTablePanel = document.getElementById("element-table-panel");
     ui.inputPanel = document.querySelector(".input-panel");
     ui.elementRowsBody = document.getElementById("element-rows-body");
     ui.addElementRow = document.getElementById("add-element-row");
     ui.jobInput = document.getElementById("job-input");
+    ui.importElementCsv = document.getElementById("import-element-csv");
+    ui.exportElementCsv = document.getElementById("export-element-csv");
+    ui.clearElements = document.getElementById("clear-elements");
+    ui.elementCsvDialog = document.getElementById("element-csv-dialog");
+    ui.elementCsvFile = document.getElementById("element-csv-file");
+    ui.elementCsvClose = document.getElementById("element-csv-close");
+    ui.elementCsvCancel = document.getElementById("element-csv-cancel");
+    ui.elementCsvConfirm = document.getElementById("element-csv-confirm");
+    ui.elementCsvError = document.getElementById("element-csv-error");
     ui.loadSample = document.getElementById("load-sample");
     ui.artworkUpload = document.getElementById("artwork-upload");
     ui.clearArtwork = document.getElementById("clear-artwork");
+    ui.artworkConfigStatus = document.getElementById("artwork-config-status");
     ui.artworkList = document.getElementById("artwork-list");
     ui.artworkFitWarning = document.getElementById("artwork-fit-warning");
     ui.inputErrors = document.getElementById("input-errors");
@@ -422,11 +427,7 @@
       if (!button) return;
       const classFilter = button.dataset.classFilter;
       if (!getClassOption(classFilter, false)) return;
-      if (classFilter === "all") {
-        const selectableClassIds = getSelectableClassOptions().map((option) => option.id);
-        const allSelected = selectableClassIds.every((id) => state.classFilters.has(id));
-        state.classFilters = allSelected ? new Set() : new Set(selectableClassIds);
-      } else if (state.classFilters.has(classFilter)) {
+      if (state.classFilters.has(classFilter)) {
         state.classFilters.delete(classFilter);
       } else {
         state.classFilters.add(classFilter);
@@ -548,17 +549,12 @@
       input.addEventListener("input", recalculate);
     });
 
-    ui.elementModeInputs.forEach((input) => {
-      input.addEventListener("change", () => {
-        if (input.checked) {
-          setElementInputMode(input.value);
-        }
-      });
-    });
-
-    ui.jobInput.addEventListener("input", () => {
-      scheduleRecalculate();
-    });
+    ui.importElementCsv.addEventListener("click", openElementCsvDialog);
+    ui.exportElementCsv.addEventListener("click", exportElementCsv);
+    ui.elementCsvClose.addEventListener("click", closeElementCsvDialog);
+    ui.elementCsvCancel.addEventListener("click", closeElementCsvDialog);
+    ui.elementCsvConfirm.addEventListener("click", importElementCsvRows);
+    ui.elementCsvFile.addEventListener("change", handleElementCsvFile);
 
     ui.loadSample.addEventListener("click", () => {
       ui.jobInput.value = SAMPLE_JOB;
@@ -568,10 +564,41 @@
       recalculate();
     });
 
+    ui.clearElements.addEventListener("click", () => {
+      ui.jobInput.value = "";
+      renderElementTableFromText();
+      state.useOffsetJoins = null;
+      state.offsetPromptDismissed = false;
+      recalculate();
+      ui.elementRowsBody.querySelector("[data-element-field='quantity']")?.focus();
+    });
+
     ui.elementRowsBody.addEventListener("input", (event) => {
       if (!event.target.closest("[data-element-field]")) return;
       syncJobInputFromElementTable();
-      scheduleRecalculate();
+      invalidateAuthoritativeQuoteForEdit();
+    });
+
+    ui.elementRowsBody.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.repeat || event.isComposing) return;
+      const shortname = event.target.closest("[data-element-field='shortname']");
+      const row = shortname?.closest("tr");
+      if (!row || row !== ui.elementRowsBody.lastElementChild) return;
+
+      event.preventDefault();
+      appendElementTableRow();
+      syncJobInputFromElementTable();
+      ui.elementRowsBody.lastElementChild
+        ?.querySelector("[data-element-field='quantity']")
+        ?.focus();
+    });
+
+    ui.elementRowsBody.addEventListener("focusout", (event) => {
+      const field = event.target.closest("[data-element-field]");
+      if (!field) return;
+      const nextField = event.relatedTarget?.closest?.("[data-element-field]");
+      if (nextField && nextField.closest("tr") === field.closest("tr")) return;
+      recalculate();
     });
 
     ui.elementTablePanel.addEventListener("paste", handleElementTablePaste);
@@ -698,7 +725,7 @@
   function resetSurveyAndFilters() {
     state.selectorSelections = {};
     state.brandFilter = "all";
-    state.classFilters = new Set(getSelectableClassOptions().map((option) => option.id));
+    state.classFilters = new Set();
     state.limitFilters.clear();
     state.mountingSurfaceFilter = MOUNTING_SURFACE_ALL;
     state.productSearchSelection = null;
@@ -713,7 +740,7 @@
 
   function clearSelectorFilters() {
     state.brandFilter = "all";
-    state.classFilters = new Set(getSelectableClassOptions().map((option) => option.id));
+    state.classFilters = new Set();
     state.limitFilters.clear();
     state.mountingSurfaceFilter = MOUNTING_SURFACE_ALL;
     state.productSearchSelection = null;
@@ -811,7 +838,6 @@
   }
 
   function getDataEntryFocusTarget() {
-    if (state.elementInputMode === "csv") return ui.jobInput;
     return ui.elementRowsBody?.querySelector("[data-element-field]") || ui.addElementRow || ui.jobInput;
   }
 
@@ -981,21 +1007,52 @@
     }
   }
 
-  function scheduleRecalculate() {
-    window.clearTimeout(recalcTimer);
-    recalcTimer = window.setTimeout(recalculate, 130);
+  function invalidateAuthoritativeQuoteForEdit() {
+    state.pricingQuoteRequestId += 1;
+    state.currentCartRequest = null;
+    state.authoritativeQuoteReady = false;
+    syncCartButtons();
+    setImpositionActionButtonsDisabled(true);
+    renderPricingConnection();
   }
 
-  function setElementInputMode(mode) {
-    state.elementInputMode = mode === "table" ? "table" : "csv";
-    if (state.elementInputMode === "table") {
-      renderElementTableFromText();
-    } else {
-      syncJobInputFromElementTable();
-    }
+  function openElementCsvDialog() {
+    syncJobInputFromElementTable();
+    ui.elementCsvError.textContent = "";
+    ui.elementCsvFile.value = "";
+    ui.elementCsvDialog.showModal();
+    ui.jobInput.focus();
+  }
 
-    ui.elementCsvPanel.hidden = state.elementInputMode !== "csv";
-    ui.elementTablePanel.hidden = state.elementInputMode !== "table";
+  function closeElementCsvDialog() {
+    if (ui.elementCsvDialog.open) ui.elementCsvDialog.close();
+  }
+
+  async function handleElementCsvFile() {
+    const file = ui.elementCsvFile.files?.[0];
+    if (!file) return;
+    ui.elementCsvError.textContent = "";
+    if (file.size > 2_000_000) {
+      ui.elementCsvError.textContent = "Choose a CSV file smaller than 2 MB.";
+      return;
+    }
+    try {
+      ui.jobInput.value = await file.text();
+    } catch {
+      ui.elementCsvError.textContent = "The selected CSV file could not be read.";
+    }
+  }
+
+  function importElementCsvRows() {
+    const rows = getElementTableRowsFromText(ui.jobInput.value);
+    if (!rows.length) {
+      ui.elementCsvError.textContent = "Add at least one CSV data row before importing.";
+      return;
+    }
+    renderElementTableFromText();
+    closeElementCsvDialog();
+    state.useOffsetJoins = null;
+    state.offsetPromptDismissed = false;
     recalculate();
   }
 
@@ -1069,6 +1126,26 @@
       width: row.querySelector("[data-element-field='width']")?.value || "",
       height: row.querySelector("[data-element-field='height']")?.value || ""
     }));
+  }
+
+  function exportElementCsv() {
+    const rows = getElementTableRows()
+      .filter((row) => Object.values(row).some((value) => String(value).trim()));
+    const lines = [
+      "Shortname,Quantity,Width,Height",
+      ...rows.map((row) => [row.shortname, row.quantity, row.width, row.height]
+        .map(formatCsvCell)
+        .join(","))
+    ];
+    const blob = new Blob([`\uFEFF${lines.join("\r\n")}\r\n`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "sav-builder-data.csv";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function handleElementTablePaste(event) {
@@ -1758,6 +1835,15 @@
     renderConfiguratorProgress(selectorState, parsed.elements);
     renderAdvancedConfigStatus();
 
+    if (parsed.errors.length) {
+      state.currentBest = null;
+      state.currentOptions = [];
+      renderConfiguratorGuidance(selectorState, parsed.elements, null);
+      renderArtworkList(parsed.elements);
+      renderEmptyResults();
+      return;
+    }
+
     if (!parsed.elements.length) {
       state.currentBest = null;
       state.currentOptions = [];
@@ -2023,7 +2109,7 @@
     const rows = selection.rows.filter((row) =>
       state.selectorRows.includes(row) &&
       row.isCompleteProduct &&
-      matchesSelectedFilters(row)
+      matchesProductSearchFilters(row)
     );
     if (!rows.length) {
       state.productSearchSelection = null;
@@ -2064,6 +2150,7 @@
 
   function renderProductSearch() {
     const query = state.productSearchQuery.trim();
+    if (ui.filtersPanel) ui.filtersPanel.hidden = Boolean(query);
     if (ui.productSearch.value !== state.productSearchQuery) {
       ui.productSearch.value = state.productSearchQuery;
     }
@@ -2106,7 +2193,7 @@
 
     state.selectorRows.forEach((row, index) => {
       if (!row.isCompleteProduct || !row.Product) return;
-      if (!matchesSelectedFilters(row)) return;
+      if (!matchesProductSearchFilters(row)) return;
       const haystack = getProductSearchHaystack(row);
       if (!terms.every((term) => matchesProductSearchTerm(haystack, term))) return;
 
@@ -2429,6 +2516,10 @@
       body = "The selector is waiting for the published Strapi catalogue.";
       status = "pending";
       disabled = true;
+    } else if (!state.classFilters.size) {
+      title = "Choose a class";
+      body = "Select one or more Class options to see matching SAV products.";
+      target = "filters";
     } else if (!selectorState.candidates.length) {
       title = "No results found";
       body = "Clear filters or broaden the selection to see matching SAV products.";
@@ -2469,7 +2560,7 @@
     return [
       state.mountingSurfaceFilter !== MOUNTING_SURFACE_ALL,
       state.brandFilter !== "all",
-      state.classFilters.size !== getSelectableClassOptions().length,
+      state.classFilters.size > 0 && state.classFilters.size !== getSelectableClassOptions().length,
       state.limitFilters.size > 0
     ].filter(Boolean).length;
   }
@@ -2497,22 +2588,24 @@
     const current = getBrandOption(state.brandFilter);
     const renderLogo = (option) => option.logo
       ? `<img class="brand-option-logo" src="${escapeHtml(option.logo)}" alt="" aria-hidden="true">`
-      : `<span class="brand-all-mark" aria-hidden="true">ALL</span>`;
+      : "";
     const options = state.brandOptions.map((option) => {
       const selected = option.id === state.brandFilter;
+      const isAllBrands = option.id === "all";
       return `
-        <button class="brand-dropdown-option${selected ? " selected" : ""}" type="button" data-brand-filter="${escapeHtml(option.id)}" role="option" aria-selected="${selected ? "true" : "false"}">
-          <span class="brand-option-media">${renderLogo(option)}</span>
-          <span class="brand-option-name">${escapeHtml(option.id === "all" ? "All brands" : option.label)}</span>
+        <button class="brand-dropdown-option${selected ? " selected" : ""}${isAllBrands ? " all-brands" : ""}" type="button" data-brand-filter="${escapeHtml(option.id)}" role="option" aria-selected="${selected ? "true" : "false"}">
+          ${isAllBrands ? "" : `<span class="brand-option-media">${renderLogo(option)}</span>`}
+          <span class="brand-option-name">${escapeHtml(isAllBrands ? "All brands" : option.label)}</span>
           <span class="brand-option-check" aria-hidden="true">✓</span>
         </button>
       `;
     }).join("");
+    const currentIsAllBrands = current.id === "all";
     ui.brandSelector.innerHTML = `
       <details class="brand-dropdown">
-        <summary class="brand-dropdown-trigger" aria-label="Select brand: ${escapeHtml(current.id === "all" ? "All brands" : current.label)}">
-          <span class="brand-option-media">${renderLogo(current)}</span>
-          <span class="brand-option-name">${escapeHtml(current.id === "all" ? "All brands" : current.label)}</span>
+        <summary class="brand-dropdown-trigger${currentIsAllBrands ? " all-brands" : ""}" aria-label="Select brand: ${escapeHtml(currentIsAllBrands ? "All brands" : current.label)}">
+          ${currentIsAllBrands ? "" : `<span class="brand-option-media">${renderLogo(current)}</span>`}
+          <span class="brand-option-name">${escapeHtml(currentIsAllBrands ? "All brands" : current.label)}</span>
           <span class="brand-dropdown-chevron" aria-hidden="true"></span>
         </summary>
         <div class="brand-dropdown-menu" role="listbox" aria-label="Brands">
@@ -2524,9 +2617,8 @@
 
   function renderClassSelector() {
     if (!ui.classSelector) return;
-    const allSelected = state.classFilters.size === getSelectableClassOptions().length;
     ui.classSelector.innerHTML = CLASS_OPTIONS.map((option) => {
-      const selected = option.id === "all" ? allSelected : state.classFilters.has(option.id);
+      const selected = state.classFilters.has(option.id);
       return `
         <button class="class-button${selected ? " selected" : ""}" type="button" data-class-filter="${escapeHtml(option.id)}" aria-pressed="${selected ? "true" : "false"}">
           <span>${escapeHtml(option.label)}</span>
@@ -2577,6 +2669,13 @@
 
   function matchesSelectedFilters(row) {
     return matchesBaseFilters(row) &&
+      matchesMountingSurfaceFilter(row);
+  }
+
+  function matchesProductSearchFilters(row) {
+    return matchesBrandOption(row, getBrandOption(state.brandFilter)) &&
+      (!state.classFilters.size || matchesSelectedClassOptions(row)) &&
+      matchesLimitFilters(row) &&
       matchesMountingSurfaceFilter(row);
   }
 
@@ -2664,7 +2763,7 @@
   }
 
   function getSelectableClassOptions() {
-    return CLASS_OPTIONS.filter((option) => option.id !== "all");
+    return CLASS_OPTIONS;
   }
 
   function getLimitFilterOption(id) {
@@ -3457,7 +3556,7 @@
     }
 
     rows.slice(firstDataRow).forEach((row, index) => {
-      const rowNumber = index + firstDataRow + 1;
+      const rowNumber = index + 1;
       if (!row.some((cell) => String(cell).trim())) return;
       const [shortname, quantity, width, height] = row;
       const element = {
@@ -4259,6 +4358,7 @@
   }
 
   function renderSelectorEmptyState(selectorState) {
+    if (!state.classFilters.size) return "";
     const showClearFilters = selectorState.hasRows &&
       !selectorState.candidates.length &&
       hasActiveSelectorFilters();
@@ -4338,7 +4438,7 @@
     if (!product) return [];
     if (state.productSearchSelection) {
       return state.productSearchSelection.rows.filter((row) =>
-        state.selectorRows.includes(row) && row.isCompleteProduct && row.Product === product && matchesSelectedFilters(row)
+        state.selectorRows.includes(row) && row.isCompleteProduct && row.Product === product && matchesProductSearchFilters(row)
       );
     }
     const selections = {
@@ -4740,7 +4840,7 @@
   function hasActiveSelectorFilters() {
     return state.mountingSurfaceFilter !== MOUNTING_SURFACE_ALL ||
       state.brandFilter !== "all" ||
-      state.classFilters.size !== getSelectableClassOptions().length ||
+      (state.classFilters.size > 0 && state.classFilters.size !== getSelectableClassOptions().length) ||
       state.limitFilters.size > 0 ||
       Boolean(state.productSearchQuery.trim());
   }
@@ -4755,6 +4855,7 @@
   }
 
   function renderArtworkList(elements) {
+    renderArtworkConfigStatus();
     const errors = state.artworkErrors
       .map((error) => `<div class="artwork-error">${escapeHtml(error)}</div>`)
       .join("");
@@ -4810,6 +4911,13 @@
     }).join("");
 
     ui.artworkList.innerHTML = `${errors}${ui.artworkList.innerHTML}`;
+  }
+
+  function renderArtworkConfigStatus() {
+    if (!ui.artworkConfigStatus) return;
+    const count = state.artworks.length;
+    ui.artworkConfigStatus.textContent = count ? `${count} ${count === 1 ? "file" : "files"}` : "No artwork";
+    ui.artworkConfigStatus.classList.toggle("custom", count > 0);
   }
 
   function getArtworkScale(artwork) {
@@ -5196,13 +5304,14 @@
       const artworkMarkup = artwork
         ? buildArtworkMarkup(placement, artwork, clipId, x, y, width, height, scale)
         : "";
+      const placementColor = getPlacementColor(placement);
       const labelPlate = canLabel && artwork
         ? `<rect x="${x + 4}" y="${y + 4}" width="${Math.min(width - 8, Math.max(76, label.length * 7))}" height="18" rx="3" fill="#17201c" opacity="0.64"/>`
         : "";
 
       return `
         <g>
-          <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="3" fill="${placement.color}" opacity="0.86"/>
+          <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="3" fill="${placementColor}" opacity="0.86"/>
           ${artworkMarkup}
           <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="3" fill="none" stroke="#17201c" stroke-opacity="0.35" stroke-width="1"/>
           ${overlapLine}
@@ -5232,6 +5341,14 @@
         ${truncatedNote}
       </svg>
     `;
+  }
+
+  function getPlacementColor(placement) {
+    if (placement?.color) return placement.color;
+    const elementIndex = Number.isInteger(Number(placement?.elementIndex))
+      ? Math.max(0, Number(placement.elementIndex))
+      : 0;
+    return COLORS[elementIndex % COLORS.length];
   }
 
   function getArtworkByElementIndex(best) {

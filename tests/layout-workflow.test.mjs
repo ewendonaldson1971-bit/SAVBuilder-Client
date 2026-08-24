@@ -1,0 +1,96 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
+
+test("organizes the SAV workflow into input and output columns", () => {
+  const leftStart = html.indexOf('class="workflow-column input-workflow"');
+  const dataEntry = html.indexOf('class="input-panel surface"');
+  const artwork = html.indexOf('class="advanced-config artwork-config"');
+  const rightStart = html.indexOf('class="workflow-column output-workflow"');
+  const stockOptions = html.indexOf('id="widths-title"');
+  const imposition = html.indexOf('id="imposition-title"');
+
+  assert.ok(leftStart >= 0 && leftStart < dataEntry && dataEntry < artwork && artwork < rightStart);
+  assert.ok(rightStart < stockOptions && stockOptions < imposition);
+  assert.match(css, /grid-template-columns:\s*minmax\(360px, 0\.82fr\) minmax\(520px, 1\.18fr\)/);
+  assert.match(css, /@media \(max-width: 980px\)[\s\S]*?\.app-shell\s*\{\s*grid-template-columns: 1fr;/);
+});
+
+test("keeps the output workflow visible while desktop users scroll the inputs", () => {
+  assert.match(css, /\.output-workflow\s*\{[\s\S]*?position: sticky;[\s\S]*?top: calc\(var\(--sticky-header-height\) \+ 16px\);[\s\S]*?max-height: calc\(100vh - var\(--sticky-header-height\) - 32px\);[\s\S]*?overflow-y: auto;/);
+  assert.match(css, /@media \(max-width: 980px\)[\s\S]*?\.output-workflow\s*\{[\s\S]*?position: static;[\s\S]*?max-height: none;[\s\S]*?overflow: visible;/);
+});
+
+test("keeps the Vivad header visible while the page scrolls", () => {
+  assert.match(css, /\.app-header\s*\{\s*position: sticky;\s*top: 0;\s*z-index: 60;/);
+  assert.match(css, /--sticky-header-height: 112px;/);
+});
+
+test("places artwork controls behind the same disclosure pattern as Advanced Options", () => {
+  assert.match(html, /<details class="advanced-config artwork-config"/);
+  assert.match(html, /<span id="artwork-title">Artwork Preview<\/span>/);
+  assert.match(html, /id="artwork-config-status" class="advanced-config-status">No artwork/);
+  assert.match(html, /class="advanced-config-body artwork-config-body"/);
+  assert.match(app, /function renderArtworkConfigStatus\(\)/);
+});
+
+test("aligns the compact Reset action with Product search", () => {
+  assert.match(html, /<div class="product-search">[\s\S]*?id="product-search"[\s\S]*?id="reset-survey"[\s\S]*?id="product-search-results"/);
+  assert.doesNotMatch(html, /class="setup-reset-row"/);
+  assert.match(css, /\.product-search\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) auto;[\s\S]*?align-items: end;/);
+  assert.match(css, /\.product-search-results\s*\{[\s\S]*?grid-column: 1 \/ -1;/);
+});
+
+test("uses the concise Perforated property label", () => {
+  assert.match(app, /id: "perforated", label: "Perforated"/);
+  assert.doesNotMatch(app, /label: "Perforated \(One Way Vision\)"/);
+});
+
+test("uses the concise Repositionable property label", () => {
+  assert.match(app, /id: "repositionable", label: "Repositionable"/);
+  assert.doesNotMatch(app, /label: "Repositionable on Install"/);
+  assert.match(css, /\.limit-selector\s*\{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(112px, 1fr\)\);/);
+});
+
+test("uses the Optically Clear property label", () => {
+  assert.match(app, /id: "optically-clear", label: "Optically Clear"/);
+  assert.doesNotMatch(app, /label: "Opti-Clear"/);
+});
+
+test("starts and resets with every class filter unselected", () => {
+  assert.match(app, /classFilters: new Set\(\)/);
+  assert.equal((app.match(/state\.classFilters = new Set\(\);/g) || []).length, 2);
+});
+
+test("does not show an empty-state pill before a class is selected", () => {
+  assert.match(app, /title = "Choose a class"/);
+  assert.match(app, /function renderSelectorEmptyState\(selectorState\) \{\s*if \(!state\.classFilters\.size\) return "";/);
+  assert.doesNotMatch(app, /Choose a class to see matching SAV products\./);
+  assert.doesNotMatch(css, /\.survey-empty\.neutral/);
+});
+
+test("orders Class above Brand and Mounting Surface", () => {
+  assert.match(html, /class="class-filter"[\s\S]*?id="class-selector"[\s\S]*?class="brand-filter"[\s\S]*?id="brand-selector"[\s\S]*?class="mounting-filter"[\s\S]*?id="mounting-surface-selector"/);
+});
+
+test("matches the Mounting Surface control shape to the Brand control", () => {
+  assert.match(css, /\.brand-dropdown-trigger,[\s\S]*?min-height: 52px;[\s\S]*?padding: 7px 12px;[\s\S]*?border-radius: 7px;/);
+  assert.match(css, /\.mounting-surface-select\s*\{[\s\S]*?min-height: 52px;[\s\S]*?padding: 7px 12px;[\s\S]*?border-radius: 7px;/);
+});
+
+test("shows the default brand once as All brands", () => {
+  assert.match(app, /currentIsAllBrands \? "" : `<span class="brand-option-media">/);
+  assert.match(app, /currentIsAllBrands \? "All brands" : current\.label/);
+  assert.doesNotMatch(css, /\.brand-all-mark/);
+});
+
+test("keeps compact dimensions and Add row on the same desktop line", () => {
+  assert.match(css, /\.element-table-panel\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) auto;[\s\S]*?align-items: end;/);
+  assert.match(css, /\.element-entry-table th:nth-child\(1\),[\s\S]*?width: 84px;/);
+  assert.match(css, /\.element-entry-table th:nth-child\(2\),[\s\S]*?\.element-entry-table td:nth-child\(3\)\s*\{\s*width: 110px;/);
+  assert.match(css, /\.element-table-panel \.table-actions\s*\{[\s\S]*?align-self: end;/);
+});

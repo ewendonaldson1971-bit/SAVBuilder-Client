@@ -45,6 +45,7 @@
     <div id="app-toast" class="app-toast" role="status" aria-live="polite" hidden></div>
 
     <main class="app-shell">
+      <div class="workflow-column input-workflow" aria-label="Configure SAV job">
       <section class="setup-panel surface" aria-labelledby="setup-title">
         <div class="section-heading">
           <div class="heading-title">
@@ -53,10 +54,6 @@
               <button class="help-button" type="button" aria-label="Product Selector help: Use the Product Selector to choose the right SAV for your application. You can search by QCode, product name, brand, mounting surface and laminate. Use the Mounting Surface, Brand, Class and Properties filters to assist with your product selection. The app will either tile or panel your job according to the size of the job and the stock width.">?</button>
             </span>
           </div>
-        </div>
-
-        <div class="setup-reset-row">
-          <button class="ghost-button compact setup-reset-button" id="reset-survey" type="button">Reset</button>
         </div>
 
         <div id="configurator-progress" class="configurator-progress" aria-label="Configurator progress"></div>
@@ -68,12 +65,18 @@
             <span>Product search</span>
             <input id="product-search" type="search" autocomplete="off" placeholder="Search product, brand, mounting surface, laminate or QCode">
           </label>
+          <button class="ghost-button compact setup-reset-button" id="reset-survey" type="button">Reset</button>
           <div id="product-search-results" class="product-search-results" aria-live="polite"></div>
         </div>
 
         <div class="filters-panel" aria-labelledby="filters-panel-title">
           <div id="filters-panel-title" class="filters-panel-title">Filters</div>
           <div class="filters-panel-body">
+            <div class="class-filter" aria-labelledby="class-filter-title">
+              <span id="class-filter-title">Class</span>
+              <div id="class-selector" class="class-selector" role="group" aria-label="Class filter"></div>
+            </div>
+
             <div class="brand-filter" aria-labelledby="brand-filter-title">
               <span id="brand-filter-title">Brand</span>
               <div id="brand-selector" class="brand-selector" aria-label="Brand filter"></div>
@@ -84,13 +87,8 @@
               <div id="mounting-surface-selector" class="mounting-surface-selector" aria-label="Mounting surface filter"></div>
             </div>
 
-            <div class="class-filter" aria-labelledby="class-filter-title">
-              <span id="class-filter-title">Class</span>
-              <div id="class-selector" class="class-selector" role="radiogroup" aria-label="Class filter"></div>
-            </div>
-
             <div class="limit-filter" aria-labelledby="limit-filter-title">
-              <span id="limit-filter-title">Properties:</span>
+              <span id="limit-filter-title">Properties</span>
               <div id="limit-selector" class="limit-selector" aria-label="Product property filters"></div>
             </div>
           </div>
@@ -159,22 +157,12 @@
               <button class="help-button" type="button" aria-label="Data Entry help: Enter the quantities and sizes and a shortname to identify each print. For multiple line items you can copy the data from a spreadsheet respecting the column headings below or import a comma delimited CSV file. Use the upload artwork feature to see the position of panel joins. You can download the imposition or email it to our customer service team by clicking the email button.">?</button>
             </span>
           </div>
-          <button class="ghost-button compact" id="load-sample" type="button">Sample</button>
-        </div>
-        <div class="entry-mode">
-          <div class="segmented two-way" role="radiogroup" aria-label="Element entry mode">
-            <label>
-              <input type="radio" name="element-entry-mode" value="table" checked>
-              <span>Table</span>
-            </label>
-            <label>
-              <input type="radio" name="element-entry-mode" value="csv">
-              <span>CSV</span>
-            </label>
+          <div class="data-entry-actions">
+            <button class="ghost-button compact" id="import-element-csv" type="button">Import CSV</button>
+            <button class="ghost-button compact" id="export-element-csv" type="button">Export CSV</button>
+            <button class="ghost-button compact" id="load-sample" type="button">Sample</button>
+            <button class="ghost-button compact" id="clear-elements" type="button">Clear</button>
           </div>
-        </div>
-        <div id="element-csv-panel" hidden>
-          <textarea id="job-input" spellcheck="false" aria-label="Job element rows" placeholder="Shortname, Quantity, Width, Height"></textarea>
         </div>
         <div id="element-table-panel" class="element-table-panel" tabindex="0">
           <div class="table-wrap element-table-wrap">
@@ -198,27 +186,37 @@
         <div id="input-errors" class="error-list" role="alert"></div>
       </section>
 
-      <section class="artwork-panel surface" aria-labelledby="artwork-title">
-        <div class="section-heading">
-          <div class="heading-title">
-            <h2 id="artwork-title">Artwork</h2>
+      <details class="advanced-config artwork-config" aria-labelledby="artwork-title">
+        <summary>
+          <span class="advanced-config-title">
+            <span class="advanced-config-icon" aria-hidden="true">+</span>
+            <span id="artwork-title">Artwork Preview</span>
             <span class="help-tooltip" data-help="You can upload your artwork to the app to see a low resolution preview of where the panel joins will be placed. You can download an imposition and email it to us so we can reproduce it faithfully. Please note you will still need to upload the overall artwork to the shopping cart.">
               <button class="help-button" type="button" aria-label="Artwork help: You can upload your artwork to the app to see a low resolution preview of where the panel joins will be placed. You can download an imposition and email it to us so we can reproduce it faithfully. Please note you will still need to upload the overall artwork to the shopping cart.">?</button>
             </span>
-          </div>
-          <button class="ghost-button compact" id="clear-artwork" type="button">Clear</button>
-        </div>
-        <p class="artwork-note">Please note that the artwork preview does not currently save. Please send us a screenshot if you want Vivad to adjust the artwork accordingly.</p>
-        <label class="upload-box">
-          <input id="artwork-upload" type="file" accept="image/*,application/pdf,.pdf" multiple>
-          <span>
-            <strong>Upload artwork files</strong>
-            <small>PNG, JPG, SVG, WebP, PDF</small>
           </span>
-        </label>
-        <div id="artwork-list" class="artwork-list"></div>
-        <div id="artwork-fit-warning" class="artwork-fit-warning" hidden></div>
-      </section>
+          <span id="artwork-config-status" class="advanced-config-status">No artwork</span>
+        </summary>
+        <div class="advanced-config-body artwork-config-body">
+          <div class="artwork-config-actions">
+            <button class="ghost-button compact" id="clear-artwork" type="button">Clear</button>
+          </div>
+          <p class="artwork-note">Please note that the artwork preview does not currently save. Please send us a screenshot if you want Vivad to adjust the artwork accordingly.</p>
+          <label class="upload-box">
+            <input id="artwork-upload" type="file" accept="image/*,application/pdf,.pdf" multiple>
+            <span>
+              <strong>Upload artwork files</strong>
+              <small>PNG, JPG, SVG, WebP, PDF</small>
+            </span>
+          </label>
+          <div id="artwork-list" class="artwork-list"></div>
+          <div id="artwork-fit-warning" class="artwork-fit-warning" hidden></div>
+        </div>
+      </details>
+
+      </div>
+
+      <div class="workflow-column output-workflow" aria-label="Review SAV pricing and imposition">
 
       <section class="results-panel surface" aria-label="Result">
         <div id="offset-prompt" class="offset-prompt hidden"></div>
@@ -306,6 +304,7 @@
         </div>
         <div id="imposition-preview" class="preview-stage"></div>
       </section>
+      </div>
     </main>
 
     <dialog id="product-gallery" class="product-gallery-dialog" aria-labelledby="product-gallery-title">
@@ -327,6 +326,29 @@
           <div id="product-gallery-thumbnails" class="product-gallery-thumbnails" aria-label="Choose a product photo"></div>
         </footer>
       </div>
+    </dialog>
+
+    <dialog id="element-csv-dialog" class="element-csv-dialog" aria-labelledby="element-csv-title">
+      <form method="dialog">
+        <div class="element-csv-heading">
+          <div><p class="eyebrow">Data entry</p><h2 id="element-csv-title">Import CSV rows</h2></div>
+          <button type="button" id="element-csv-close" aria-label="Close CSV import">×</button>
+        </div>
+        <p>Choose a CSV file or paste rows using the columns Shortname, Quantity, Width and Height.</p>
+        <label class="csv-file-control">
+          <input id="element-csv-file" type="file" accept=".csv,text/csv,text/plain">
+          <span>Choose CSV file</span>
+        </label>
+        <label class="field">
+          <span>CSV data</span>
+          <textarea id="job-input" spellcheck="false" aria-label="Job element rows" placeholder="Shortname, Quantity, Width, Height"></textarea>
+        </label>
+        <div id="element-csv-error" class="error-list" role="alert"></div>
+        <div class="element-csv-actions">
+          <button class="ghost-button" type="button" id="element-csv-cancel">Cancel</button>
+          <button class="primary-button" type="button" id="element-csv-confirm">Import rows</button>
+        </div>
+      </form>
     </dialog>
 
     <dialog id="pricing-login" class="pricing-login-dialog">
