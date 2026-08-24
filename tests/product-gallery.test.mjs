@@ -66,3 +66,7 @@ test("product search treats no selected classes as all classes", () => {
   assert.match(app, /function getProductSearchResults\(query\)[\s\S]*?if \(!matchesProductSearchFilters\(row\)\) return;/);
   assert.match(app, /getActiveProductSearchSelectionState\(\)[\s\S]*?row\.isCompleteProduct &&[\s\S]*?matchesProductSearchFilters\(row\)/);
 });
+
+test("product search hides filters while the user is typing", () => {
+  assert.match(app, /function renderProductSearch\(\) \{\s*const query = state\.productSearchQuery\.trim\(\);\s*if \(ui\.filtersPanel\) ui\.filtersPanel\.hidden = Boolean\(query\);/);
+});
