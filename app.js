@@ -58,7 +58,7 @@
     { id: "greyback", label: "Greyback", columns: ["Greyback", "Grey back", "Grayback", "Gray back"] },
     { id: "translucent", label: "Translucent", columns: ["Translucent"] },
     { id: "clear", label: "Clear", columns: ["Clear"] },
-    { id: "optically-clear", label: "Opti-Clear", columns: ["Optically Clear"] },
+    { id: "optically-clear", label: "Optically Clear", columns: ["Optically Clear"] },
     { id: "perforated", label: "Perforated", columns: ["Perforated", "Perforated (One way Vision)", "Perforated (One Way Vision)"] },
     { id: "reflective", label: "Reflective", columns: ["Reflective"] },
     { id: "specialty", label: "Specialty", columns: ["Specialty"] },
@@ -4294,13 +4294,12 @@
   }
 
   function renderSelectorEmptyState(selectorState) {
-    const awaitingClassSelection = !state.classFilters.size;
+    if (!state.classFilters.size) return "";
     const showClearFilters = selectorState.hasRows &&
       !selectorState.candidates.length &&
-      !awaitingClassSelection &&
       hasActiveSelectorFilters();
     return `
-      <div class="survey-empty${awaitingClassSelection ? " neutral" : ""}">
+      <div class="survey-empty">
         <span>${escapeHtml(getSelectorEmptyMessage(selectorState))}</span>
         ${showClearFilters ? `<button class="ghost-button compact" type="button" data-selector-clear-filters="true">Clear filters</button>` : ""}
       </div>
@@ -4769,7 +4768,6 @@
 
   function getSelectorEmptyMessage(selectorState) {
     if (!selectorState.hasRows) return "No selector data loaded.";
-    if (!state.classFilters.size) return "Choose a class to see matching SAV products.";
     if (!selectorState.candidates.length) return "No results found for this selection";
     if (selectorState.question) return "Answer the product survey to select stock.";
     return "No complete product data is available for this selection yet.";

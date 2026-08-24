@@ -1479,13 +1479,6 @@ button.og-preview { cursor: pointer; }
   font-weight: 700;
 }
 
-.survey-empty.neutral {
-  border-color: rgba(52, 142, 222, 0.28);
-  background: #f7fbff;
-  color: var(--ink);
-  font-weight: 600;
-}
-
 .survey-empty .ghost-button {
   justify-self: start;
   min-height: 32px;
@@ -2684,7 +2677,7 @@ textarea::placeholder {
 .artwork-error,
 .artwork-fit-warning,
 .offset-prompt p,
-.survey-empty:not(.neutral) {
+.survey-empty {
   color: var(--vivad-red-dark);
 }
 

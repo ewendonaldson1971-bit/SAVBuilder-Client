@@ -56,9 +56,9 @@ test("uses the concise Repositionable property label", () => {
   assert.match(css, /\.limit-selector\s*\{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(112px, 1fr\)\);/);
 });
 
-test("uses the Opti-Clear property label", () => {
-  assert.match(app, /id: "optically-clear", label: "Opti-Clear"/);
-  assert.doesNotMatch(app, /label: "Optically Clear"/);
+test("uses the Optically Clear property label", () => {
+  assert.match(app, /id: "optically-clear", label: "Optically Clear"/);
+  assert.doesNotMatch(app, /label: "Opti-Clear"/);
 });
 
 test("starts and resets with every class filter unselected", () => {
@@ -66,12 +66,11 @@ test("starts and resets with every class filter unselected", () => {
   assert.equal((app.match(/state\.classFilters = new Set\(\);/g) || []).length, 2);
 });
 
-test("treats the initial empty class selection as neutral guidance", () => {
+test("does not show an empty-state pill before a class is selected", () => {
   assert.match(app, /title = "Choose a class"/);
-  assert.match(app, /Choose a class to see matching SAV products\./);
-  assert.match(app, /survey-empty\$\{awaitingClassSelection \? " neutral" : ""\}/);
-  assert.match(css, /\.survey-empty\.neutral\s*\{/);
-  assert.match(css, /\.survey-empty:not\(\.neutral\)/);
+  assert.match(app, /function renderSelectorEmptyState\(selectorState\) \{\s*if \(!state\.classFilters\.size\) return "";/);
+  assert.doesNotMatch(app, /Choose a class to see matching SAV products\./);
+  assert.doesNotMatch(css, /\.survey-empty\.neutral/);
 });
 
 test("places Mounting Surface immediately after the Class controls", () => {
