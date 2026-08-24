@@ -45,6 +45,11 @@ test("aligns the compact Reset action with Product search", () => {
   assert.match(css, /\.product-search-results\s*\{[\s\S]*?grid-column: 1 \/ -1;/);
 });
 
+test("uses the concise Perforated property label", () => {
+  assert.match(app, /id: "perforated", label: "Perforated"/);
+  assert.doesNotMatch(app, /label: "Perforated \(One Way Vision\)"/);
+});
+
 test("starts and resets with every class filter unselected", () => {
   assert.match(app, /classFilters: new Set\(\)/);
   assert.equal((app.match(/state\.classFilters = new Set\(\);/g) || []).length, 2);
