@@ -60,3 +60,9 @@ test("the class selector only renders the individual class controls", () => {
   assert.doesNotMatch(classOptions, /id: "all"/);
   assert.doesNotMatch(app, /data-class-filter="all"/);
 });
+
+test("product search treats no selected classes as all classes", () => {
+  assert.match(app, /function matchesProductSearchFilters\(row\) \{[\s\S]*?\(!state\.classFilters\.size \|\| matchesSelectedClassOptions\(row\)\)/);
+  assert.match(app, /function getProductSearchResults\(query\)[\s\S]*?if \(!matchesProductSearchFilters\(row\)\) return;/);
+  assert.match(app, /getActiveProductSearchSelectionState\(\)[\s\S]*?row\.isCompleteProduct &&[\s\S]*?matchesProductSearchFilters\(row\)/);
+});

@@ -2054,7 +2054,7 @@
     const rows = selection.rows.filter((row) =>
       state.selectorRows.includes(row) &&
       row.isCompleteProduct &&
-      matchesSelectedFilters(row)
+      matchesProductSearchFilters(row)
     );
     if (!rows.length) {
       state.productSearchSelection = null;
@@ -2137,7 +2137,7 @@
 
     state.selectorRows.forEach((row, index) => {
       if (!row.isCompleteProduct || !row.Product) return;
-      if (!matchesSelectedFilters(row)) return;
+      if (!matchesProductSearchFilters(row)) return;
       const haystack = getProductSearchHaystack(row);
       if (!terms.every((term) => matchesProductSearchTerm(haystack, term))) return;
 
@@ -2613,6 +2613,13 @@
 
   function matchesSelectedFilters(row) {
     return matchesBaseFilters(row) &&
+      matchesMountingSurfaceFilter(row);
+  }
+
+  function matchesProductSearchFilters(row) {
+    return matchesBrandOption(row, getBrandOption(state.brandFilter)) &&
+      (!state.classFilters.size || matchesSelectedClassOptions(row)) &&
+      matchesLimitFilters(row) &&
       matchesMountingSurfaceFilter(row);
   }
 
@@ -4376,7 +4383,7 @@
     if (!product) return [];
     if (state.productSearchSelection) {
       return state.productSearchSelection.rows.filter((row) =>
-        state.selectorRows.includes(row) && row.isCompleteProduct && row.Product === product && matchesSelectedFilters(row)
+        state.selectorRows.includes(row) && row.isCompleteProduct && row.Product === product && matchesProductSearchFilters(row)
       );
     }
     const selections = {
