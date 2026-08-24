@@ -82,3 +82,10 @@ test("shows the default brand once as All brands", () => {
   assert.match(app, /currentIsAllBrands \? "All brands" : current\.label/);
   assert.doesNotMatch(css, /\.brand-all-mark/);
 });
+
+test("keeps compact dimensions and Add row on the same desktop line", () => {
+  assert.match(css, /\.element-table-panel\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) auto;[\s\S]*?align-items: end;/);
+  assert.match(css, /\.element-entry-table th:nth-child\(1\),[\s\S]*?width: 64px;/);
+  assert.match(css, /\.element-entry-table th:nth-child\(2\),[\s\S]*?\.element-entry-table td:nth-child\(3\)\s*\{\s*width: 84px;/);
+  assert.match(css, /\.element-table-panel \.table-actions\s*\{[\s\S]*?align-self: end;/);
+});

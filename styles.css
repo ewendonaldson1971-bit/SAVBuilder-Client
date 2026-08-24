@@ -1644,7 +1644,9 @@ textarea:focus {
 
 .element-table-panel {
   display: grid;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 6px;
 }
 
 .element-csv-dialog {
@@ -2948,14 +2950,14 @@ th,
 
 .element-entry-table th:nth-child(1),
 .element-entry-table td:nth-child(1) {
-  width: 21%;
+  width: 64px;
 }
 
 .element-entry-table th:nth-child(2),
 .element-entry-table td:nth-child(2),
 .element-entry-table th:nth-child(3),
 .element-entry-table td:nth-child(3) {
-  width: 24%;
+  width: 84px;
 }
 
 .element-entry-table th:nth-child(4),
@@ -2984,6 +2986,11 @@ th,
 
 .element-entry-table tbody tr:only-child [data-remove-element-row] {
   visibility: hidden;
+}
+
+.element-table-panel .table-actions {
+  align-self: end;
+  padding-bottom: 6px;
 }
 
 /* Wide data tables use readable labels, not loud spreadsheet headers. */
@@ -3023,6 +3030,15 @@ th,
 }
 
 @media (max-width: 760px) {
+  .element-table-panel {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .element-table-panel .table-actions {
+    padding-bottom: 0;
+  }
+
   body {
     background:
       linear-gradient(180deg, #ffffff 0, #ffffff 294px, var(--paper) 294px),
