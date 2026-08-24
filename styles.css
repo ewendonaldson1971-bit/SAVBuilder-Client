@@ -917,7 +917,7 @@ h2 {
 
 .limit-selector {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
   gap: 3px 8px;
   padding: 7px 9px;
   border: 1px solid var(--line);

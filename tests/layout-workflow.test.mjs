@@ -53,6 +53,7 @@ test("uses the concise Perforated property label", () => {
 test("uses the concise Repositionable property label", () => {
   assert.match(app, /id: "repositionable", label: "Repositionable"/);
   assert.doesNotMatch(app, /label: "Repositionable on Install"/);
+  assert.match(css, /\.limit-selector\s*\{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(112px, 1fr\)\);/);
 });
 
 test("uses the Opti-Clear property label", () => {
