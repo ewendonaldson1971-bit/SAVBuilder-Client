@@ -160,22 +160,10 @@
               <button class="help-button" type="button" aria-label="Data Entry help: Enter the quantities and sizes and a shortname to identify each print. For multiple line items you can copy the data from a spreadsheet respecting the column headings below or import a comma delimited CSV file. Use the upload artwork feature to see the position of panel joins. You can download the imposition or email it to our customer service team by clicking the email button.">?</button>
             </span>
           </div>
-          <button class="ghost-button compact" id="load-sample" type="button">Sample</button>
-        </div>
-        <div class="entry-mode">
-          <div class="segmented two-way" role="radiogroup" aria-label="Element entry mode">
-            <label>
-              <input type="radio" name="element-entry-mode" value="table" checked>
-              <span>Table</span>
-            </label>
-            <label>
-              <input type="radio" name="element-entry-mode" value="csv">
-              <span>CSV</span>
-            </label>
+          <div class="data-entry-actions">
+            <button class="ghost-button compact" id="import-element-csv" type="button">Import CSV</button>
+            <button class="ghost-button compact" id="load-sample" type="button">Sample</button>
           </div>
-        </div>
-        <div id="element-csv-panel" hidden>
-          <textarea id="job-input" spellcheck="false" aria-label="Job element rows" placeholder="Shortname, Quantity, Width, Height"></textarea>
         </div>
         <div id="element-table-panel" class="element-table-panel" tabindex="0">
           <div class="table-wrap element-table-wrap">
@@ -333,6 +321,29 @@
           <div id="product-gallery-thumbnails" class="product-gallery-thumbnails" aria-label="Choose a product photo"></div>
         </footer>
       </div>
+    </dialog>
+
+    <dialog id="element-csv-dialog" class="element-csv-dialog" aria-labelledby="element-csv-title">
+      <form method="dialog">
+        <div class="element-csv-heading">
+          <div><p class="eyebrow">Data entry</p><h2 id="element-csv-title">Import CSV rows</h2></div>
+          <button type="button" id="element-csv-close" aria-label="Close CSV import">×</button>
+        </div>
+        <p>Choose a CSV file or paste rows using the columns Shortname, Quantity, Width and Height.</p>
+        <label class="csv-file-control">
+          <input id="element-csv-file" type="file" accept=".csv,text/csv,text/plain">
+          <span>Choose CSV file</span>
+        </label>
+        <label class="field">
+          <span>CSV data</span>
+          <textarea id="job-input" spellcheck="false" aria-label="Job element rows" placeholder="Shortname, Quantity, Width, Height"></textarea>
+        </label>
+        <div id="element-csv-error" class="error-list" role="alert"></div>
+        <div class="element-csv-actions">
+          <button class="ghost-button" type="button" id="element-csv-cancel">Cancel</button>
+          <button class="primary-button" type="button" id="element-csv-confirm">Import rows</button>
+        </div>
+      </form>
     </dialog>
 
     <dialog id="pricing-login" class="pricing-login-dialog">

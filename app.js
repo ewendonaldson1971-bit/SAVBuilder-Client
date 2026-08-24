@@ -180,7 +180,6 @@
     productSearchQuery: "",
     productSearchResults: [],
     productSearchSelection: null,
-    elementInputMode: "table",
     productSource: "strapi",
     useOffsetJoins: null,
     offsetPromptDismissed: false,
@@ -256,13 +255,18 @@
     ui.bleedMm = document.getElementById("bleed-mm");
     ui.overlapMm = document.getElementById("overlap-mm");
     ui.advancedOffsetChoices = document.getElementById("advanced-offset-choices");
-    ui.elementModeInputs = Array.from(document.querySelectorAll("input[name='element-entry-mode']"));
-    ui.elementCsvPanel = document.getElementById("element-csv-panel");
     ui.elementTablePanel = document.getElementById("element-table-panel");
     ui.inputPanel = document.querySelector(".input-panel");
     ui.elementRowsBody = document.getElementById("element-rows-body");
     ui.addElementRow = document.getElementById("add-element-row");
     ui.jobInput = document.getElementById("job-input");
+    ui.importElementCsv = document.getElementById("import-element-csv");
+    ui.elementCsvDialog = document.getElementById("element-csv-dialog");
+    ui.elementCsvFile = document.getElementById("element-csv-file");
+    ui.elementCsvClose = document.getElementById("element-csv-close");
+    ui.elementCsvCancel = document.getElementById("element-csv-cancel");
+    ui.elementCsvConfirm = document.getElementById("element-csv-confirm");
+    ui.elementCsvError = document.getElementById("element-csv-error");
     ui.loadSample = document.getElementById("load-sample");
     ui.artworkUpload = document.getElementById("artwork-upload");
     ui.clearArtwork = document.getElementById("clear-artwork");
@@ -548,17 +552,11 @@
       input.addEventListener("input", recalculate);
     });
 
-    ui.elementModeInputs.forEach((input) => {
-      input.addEventListener("change", () => {
-        if (input.checked) {
-          setElementInputMode(input.value);
-        }
-      });
-    });
-
-    ui.jobInput.addEventListener("input", () => {
-      scheduleRecalculate();
-    });
+    ui.importElementCsv.addEventListener("click", openElementCsvDialog);
+    ui.elementCsvClose.addEventListener("click", closeElementCsvDialog);
+    ui.elementCsvCancel.addEventListener("click", closeElementCsvDialog);
+    ui.elementCsvConfirm.addEventListener("click", importElementCsvRows);
+    ui.elementCsvFile.addEventListener("change", handleElementCsvFile);
 
     ui.loadSample.addEventListener("click", () => {
       ui.jobInput.value = SAMPLE_JOB;
@@ -811,7 +809,6 @@
   }
 
   function getDataEntryFocusTarget() {
-    if (state.elementInputMode === "csv") return ui.jobInput;
     return ui.elementRowsBody?.querySelector("[data-element-field]") || ui.addElementRow || ui.jobInput;
   }
 
@@ -986,16 +983,43 @@
     recalcTimer = window.setTimeout(recalculate, 130);
   }
 
-  function setElementInputMode(mode) {
-    state.elementInputMode = mode === "table" ? "table" : "csv";
-    if (state.elementInputMode === "table") {
-      renderElementTableFromText();
-    } else {
-      syncJobInputFromElementTable();
-    }
+  function openElementCsvDialog() {
+    syncJobInputFromElementTable();
+    ui.elementCsvError.textContent = "";
+    ui.elementCsvFile.value = "";
+    ui.elementCsvDialog.showModal();
+    ui.jobInput.focus();
+  }
 
-    ui.elementCsvPanel.hidden = state.elementInputMode !== "csv";
-    ui.elementTablePanel.hidden = state.elementInputMode !== "table";
+  function closeElementCsvDialog() {
+    if (ui.elementCsvDialog.open) ui.elementCsvDialog.close();
+  }
+
+  async function handleElementCsvFile() {
+    const file = ui.elementCsvFile.files?.[0];
+    if (!file) return;
+    ui.elementCsvError.textContent = "";
+    if (file.size > 2_000_000) {
+      ui.elementCsvError.textContent = "Choose a CSV file smaller than 2 MB.";
+      return;
+    }
+    try {
+      ui.jobInput.value = await file.text();
+    } catch {
+      ui.elementCsvError.textContent = "The selected CSV file could not be read.";
+    }
+  }
+
+  function importElementCsvRows() {
+    const rows = getElementTableRowsFromText(ui.jobInput.value);
+    if (!rows.length) {
+      ui.elementCsvError.textContent = "Add at least one CSV data row before importing.";
+      return;
+    }
+    renderElementTableFromText();
+    closeElementCsvDialog();
+    state.useOffsetJoins = null;
+    state.offsetPromptDismissed = false;
     recalculate();
   }
 
