@@ -270,6 +270,7 @@
     ui.loadSample = document.getElementById("load-sample");
     ui.artworkUpload = document.getElementById("artwork-upload");
     ui.clearArtwork = document.getElementById("clear-artwork");
+    ui.artworkConfigStatus = document.getElementById("artwork-config-status");
     ui.artworkList = document.getElementById("artwork-list");
     ui.artworkFitWarning = document.getElementById("artwork-fit-warning");
     ui.inputErrors = document.getElementById("input-errors");
@@ -4786,6 +4787,7 @@
   }
 
   function renderArtworkList(elements) {
+    renderArtworkConfigStatus();
     const errors = state.artworkErrors
       .map((error) => `<div class="artwork-error">${escapeHtml(error)}</div>`)
       .join("");
@@ -4841,6 +4843,13 @@
     }).join("");
 
     ui.artworkList.innerHTML = `${errors}${ui.artworkList.innerHTML}`;
+  }
+
+  function renderArtworkConfigStatus() {
+    if (!ui.artworkConfigStatus) return;
+    const count = state.artworks.length;
+    ui.artworkConfigStatus.textContent = count ? `${count} ${count === 1 ? "file" : "files"}` : "No artwork";
+    ui.artworkConfigStatus.classList.toggle("custom", count > 0);
   }
 
   function getArtworkScale(artwork) {

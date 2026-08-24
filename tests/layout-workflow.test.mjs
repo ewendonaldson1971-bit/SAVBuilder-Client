@@ -9,7 +9,7 @@ const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
 test("organizes the SAV workflow into input and output columns", () => {
   const leftStart = html.indexOf('class="workflow-column input-workflow"');
   const dataEntry = html.indexOf('class="input-panel surface"');
-  const artwork = html.indexOf('class="artwork-panel surface"');
+  const artwork = html.indexOf('class="advanced-config artwork-config"');
   const rightStart = html.indexOf('class="workflow-column output-workflow"');
   const stockOptions = html.indexOf('id="widths-title"');
   const imposition = html.indexOf('id="imposition-title"');
@@ -28,6 +28,14 @@ test("keeps the output workflow visible while desktop users scroll the inputs", 
 test("keeps the Vivad header visible while the page scrolls", () => {
   assert.match(css, /\.app-header\s*\{\s*position: sticky;\s*top: 0;\s*z-index: 60;/);
   assert.match(css, /--sticky-header-height: 112px;/);
+});
+
+test("places artwork controls behind the same disclosure pattern as Advanced Options", () => {
+  assert.match(html, /<details class="advanced-config artwork-config"/);
+  assert.match(html, /<span id="artwork-title">Artwork Preview<\/span>/);
+  assert.match(html, /id="artwork-config-status" class="advanced-config-status">No artwork/);
+  assert.match(html, /class="advanced-config-body artwork-config-body"/);
+  assert.match(app, /function renderArtworkConfigStatus\(\)/);
 });
 
 test("starts and resets with every class filter unselected", () => {

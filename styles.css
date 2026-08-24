@@ -703,6 +703,23 @@ h2 {
   background: #fff;
 }
 
+.artwork-config {
+  margin-top: 0;
+}
+
+.artwork-config-body {
+  gap: 12px;
+}
+
+.artwork-config-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.artwork-config .artwork-note {
+  margin: 0;
+}
+
 .advanced-offset-field {
   margin-bottom: 0;
 }

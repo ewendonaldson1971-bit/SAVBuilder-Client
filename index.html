@@ -187,27 +187,33 @@
         <div id="input-errors" class="error-list" role="alert"></div>
       </section>
 
-      <section class="artwork-panel surface" aria-labelledby="artwork-title">
-        <div class="section-heading">
-          <div class="heading-title">
-            <h2 id="artwork-title">Artwork</h2>
+      <details class="advanced-config artwork-config" aria-labelledby="artwork-title">
+        <summary>
+          <span class="advanced-config-title">
+            <span class="advanced-config-icon" aria-hidden="true">+</span>
+            <span id="artwork-title">Artwork Preview</span>
             <span class="help-tooltip" data-help="You can upload your artwork to the app to see a low resolution preview of where the panel joins will be placed. You can download an imposition and email it to us so we can reproduce it faithfully. Please note you will still need to upload the overall artwork to the shopping cart.">
               <button class="help-button" type="button" aria-label="Artwork help: You can upload your artwork to the app to see a low resolution preview of where the panel joins will be placed. You can download an imposition and email it to us so we can reproduce it faithfully. Please note you will still need to upload the overall artwork to the shopping cart.">?</button>
             </span>
-          </div>
-          <button class="ghost-button compact" id="clear-artwork" type="button">Clear</button>
-        </div>
-        <p class="artwork-note">Please note that the artwork preview does not currently save. Please send us a screenshot if you want Vivad to adjust the artwork accordingly.</p>
-        <label class="upload-box">
-          <input id="artwork-upload" type="file" accept="image/*,application/pdf,.pdf" multiple>
-          <span>
-            <strong>Upload artwork files</strong>
-            <small>PNG, JPG, SVG, WebP, PDF</small>
           </span>
-        </label>
-        <div id="artwork-list" class="artwork-list"></div>
-        <div id="artwork-fit-warning" class="artwork-fit-warning" hidden></div>
-      </section>
+          <span id="artwork-config-status" class="advanced-config-status">No artwork</span>
+        </summary>
+        <div class="advanced-config-body artwork-config-body">
+          <div class="artwork-config-actions">
+            <button class="ghost-button compact" id="clear-artwork" type="button">Clear</button>
+          </div>
+          <p class="artwork-note">Please note that the artwork preview does not currently save. Please send us a screenshot if you want Vivad to adjust the artwork accordingly.</p>
+          <label class="upload-box">
+            <input id="artwork-upload" type="file" accept="image/*,application/pdf,.pdf" multiple>
+            <span>
+              <strong>Upload artwork files</strong>
+              <small>PNG, JPG, SVG, WebP, PDF</small>
+            </span>
+          </label>
+          <div id="artwork-list" class="artwork-list"></div>
+          <div id="artwork-fit-warning" class="artwork-fit-warning" hidden></div>
+        </div>
+      </details>
 
       </div>
 
