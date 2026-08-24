@@ -1014,9 +1014,10 @@ h2 {
 
 .mounting-surface-select {
   width: 100%;
-  min-height: 36px;
-  padding: 7px 10px;
+  min-height: 52px;
+  padding: 7px 12px;
   border-color: #348ede;
+  border-radius: 7px;
   color: var(--ink);
   font-size: 0.86rem;
   font-weight: 600;

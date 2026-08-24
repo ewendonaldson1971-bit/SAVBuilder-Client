@@ -77,6 +77,11 @@ test("orders Class above Brand and Mounting Surface", () => {
   assert.match(html, /class="class-filter"[\s\S]*?id="class-selector"[\s\S]*?class="brand-filter"[\s\S]*?id="brand-selector"[\s\S]*?class="mounting-filter"[\s\S]*?id="mounting-surface-selector"/);
 });
 
+test("matches the Mounting Surface control shape to the Brand control", () => {
+  assert.match(css, /\.brand-dropdown-trigger,[\s\S]*?min-height: 52px;[\s\S]*?padding: 7px 12px;[\s\S]*?border-radius: 7px;/);
+  assert.match(css, /\.mounting-surface-select\s*\{[\s\S]*?min-height: 52px;[\s\S]*?padding: 7px 12px;[\s\S]*?border-radius: 7px;/);
+});
+
 test("shows the default brand once as All brands", () => {
   assert.match(app, /currentIsAllBrands \? "" : `<span class="brand-option-media">/);
   assert.match(app, /currentIsAllBrands \? "All brands" : current\.label/);
