@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cabin:wght@500;600;700&family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=gallery-card-class-all-20260823">
+    <link rel="stylesheet" href="styles.css?v=progressive-controls-20260829">
   </head>
   <body>
     <header class="app-header">
@@ -39,6 +39,19 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="m4 7 8 6 8-6"/></svg>
           </button>
         </div>
+        <a
+          class="strapi-admin-link"
+          href="https://strapi.vivad.com.au/admin/content-manager/collection-types/api::sav-builder-option.sav-builder-option?pageSize=10"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open SAV Builder products in Strapi"
+          title="Manage SAV Builder products in Strapi"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <rect x="2" y="2" width="20" height="20" rx="6"></rect>
+            <text x="12" y="16" text-anchor="middle">S</text>
+          </svg>
+        </a>
       </div>
     </header>
 
@@ -60,23 +73,24 @@
         <div id="configurator-guidance" class="configurator-guidance" aria-live="polite"></div>
         <div id="sheet-status" class="sheet-status" role="status" aria-live="polite" hidden></div>
 
-        <div class="product-search">
-          <label class="field product-search-field">
-            <span>Product search</span>
-            <input id="product-search" type="search" autocomplete="off" placeholder="Search product, brand, mounting surface, laminate or QCode">
-          </label>
-          <button class="ghost-button compact setup-reset-button" id="reset-survey" type="button">Reset</button>
-          <div id="product-search-results" class="product-search-results" aria-live="polite"></div>
-        </div>
+        <section id="class-step" class="class-step" aria-labelledby="class-step-title">
+          <div class="class-step-heading">
+            <span class="class-step-kicker">Start here</span>
+            <h3 id="class-step-title">Choose a product class</h3>
+            <p>Select one or more classes to show the most suitable SAV products.</p>
+          </div>
+          <div id="class-selector" class="class-selector" role="group" aria-label="Product class"></div>
+        </section>
 
-        <div class="filters-panel" aria-labelledby="filters-panel-title">
-          <div id="filters-panel-title" class="filters-panel-title">Filters</div>
+        <details class="filters-panel" aria-labelledby="filters-panel-title" hidden>
+          <summary id="filters-panel-title" class="filters-panel-title">
+            <span>
+              <strong>Additional filters</strong>
+              <small>Brand, mounting surface and properties</small>
+            </span>
+            <span class="filters-panel-chevron" aria-hidden="true"></span>
+          </summary>
           <div class="filters-panel-body">
-            <div class="class-filter" aria-labelledby="class-filter-title">
-              <span id="class-filter-title">Class</span>
-              <div id="class-selector" class="class-selector" role="group" aria-label="Class filter"></div>
-            </div>
-
             <div class="brand-filter" aria-labelledby="brand-filter-title">
               <span id="brand-filter-title">Brand</span>
               <div id="brand-selector" class="brand-selector" aria-label="Brand filter"></div>
@@ -92,11 +106,20 @@
               <div id="limit-selector" class="limit-selector" aria-label="Product property filters"></div>
             </div>
           </div>
+        </details>
+
+        <div class="product-search">
+          <label class="field product-search-field">
+            <span>Already know the product?</span>
+            <input id="product-search" type="search" autocomplete="off" placeholder="Search product, brand, mounting surface, laminate or QCode">
+          </label>
+          <button class="ghost-button compact setup-reset-button" id="reset-survey" type="button">Reset</button>
+          <div id="product-search-results" class="product-search-results" aria-live="polite"></div>
         </div>
 
         <div id="selector-survey" class="selector-survey"></div>
 
-        <details class="advanced-config">
+        <details class="advanced-config" id="advanced-options-config" hidden>
           <summary>
             <span class="advanced-config-title">
               <span class="advanced-config-icon" aria-hidden="true">+</span>
@@ -186,7 +209,7 @@
         <div id="input-errors" class="error-list" role="alert"></div>
       </section>
 
-      <details class="advanced-config artwork-config" aria-labelledby="artwork-title">
+      <details class="advanced-config artwork-config" id="artwork-config" aria-labelledby="artwork-title" hidden>
         <summary>
           <span class="advanced-config-title">
             <span class="advanced-config-icon" aria-hidden="true">+</span>
@@ -216,7 +239,7 @@
 
       </div>
 
-      <div class="workflow-column output-workflow" aria-label="Review SAV pricing and imposition">
+      <div class="workflow-column output-workflow" aria-label="Review SAV pricing and imposition" hidden>
 
       <section class="results-panel surface" aria-label="Result">
         <div id="offset-prompt" class="offset-prompt hidden"></div>
@@ -365,7 +388,7 @@
     <script src="pdfjs/pdf.classic.js"></script>
     <script src="pdfjs/pdf.worker.classic.js"></script>
     <script
-      src="app.js?v=gallery-below-general-image-20260823"
+      src="app.js?v=progressive-controls-20260829"
       data-apps-script-url="https://script.google.com/macros/s/AKfycbwN0Ocx_0jE9VD4nQLOAV9NaycPF9pRDe4Z3GmUTfLKWamcJjmz48MxdB7AQ6xlZrCu/exec"
       data-strapi-url="https://strapi.vivad.com.au"
       data-pricing-api-url="https://vivadpricing-app.calmtree-53cc02bb.australiasoutheast.azurecontainerapps.io"

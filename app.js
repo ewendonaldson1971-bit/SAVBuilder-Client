@@ -188,6 +188,7 @@
     currentOptions: [],
     currentCartLines: [],
     currentCartRequest: null,
+    selectedStockQcode: "",
     authoritativeQuoteReady: false,
     cartSubmissionBusy: false,
     pricingApiToken: window.sessionStorage.getItem("savBuilderPricingToken") || "",
@@ -236,8 +237,13 @@
     ui.configuratorProgress = document.getElementById("configurator-progress");
     ui.configuratorGuidance = document.getElementById("configurator-guidance");
     ui.advancedConfigStatus = document.getElementById("advanced-config-status");
+    ui.classStep = document.getElementById("class-step");
     ui.productSearchPanel = document.querySelector(".product-search");
     ui.filtersPanel = document.querySelector(".filters-panel");
+    ui.advancedOptionsConfig = document.getElementById("advanced-options-config");
+    ui.artworkConfig = document.getElementById("artwork-config");
+    ui.outputWorkflow = document.querySelector(".output-workflow");
+    ui.appShell = document.querySelector(".app-shell");
     ui.brandSelector = document.getElementById("brand-selector");
     ui.classSelector = document.getElementById("class-selector");
     ui.limitSelector = document.getElementById("limit-selector");
@@ -518,7 +524,18 @@
         return;
       }
 
+      if (!choice || choice.querySelector('input[type="radio"]')) return;
+      applySelectorChoice(choice);
+    });
+
+    ui.selectorSurvey.addEventListener("change", (event) => {
+      const radio = event.target.closest('input[type="radio"]');
+      const choice = radio?.closest("[data-selector-column]");
       if (!choice) return;
+      applySelectorChoice(choice);
+    });
+
+    function applySelectorChoice(choice) {
       const column = choice.dataset.selectorColumn;
       if (column === "Product" && reopenLaminateSelectionForProduct(choice.dataset.selectorValue)) {
         state.productSearchSelection = null;
@@ -526,6 +543,25 @@
         return;
       }
       const shouldKeepSearchSelection = Boolean(state.productSearchSelection) && column !== "Product";
+      if (shouldKeepSearchSelection && state.productSearchSelection) {
+        const updatedSelections = {
+          ...state.productSearchSelection.selections,
+          [column]: choice.dataset.selectorValue
+        };
+        if (choice.dataset.selectorPreserveAfter !== "true") {
+          const order = getSelectorSelectionOrder();
+          const index = order.indexOf(column);
+          if (index >= 0) {
+            order.slice(index + 1).forEach((laterColumn) => {
+              delete updatedSelections[laterColumn];
+            });
+          }
+        }
+        state.productSearchSelection.selections = updatedSelections;
+        state.selectorSelections = { ...updatedSelections };
+        recalculate();
+        return;
+      }
       if (!shouldKeepSearchSelection) {
         state.productSearchSelection = null;
       }
@@ -535,11 +571,8 @@
       } else {
         pruneSelectionsAfter(column);
       }
-      if (shouldKeepSearchSelection && state.productSearchSelection) {
-        state.productSearchSelection.selections = { ...state.selectorSelections };
-      }
       recalculate();
-    });
+    }
 
     document.querySelectorAll("input[name='bleed-type']").forEach((input) => {
       input.addEventListener("change", recalculate);
@@ -651,6 +684,8 @@
 
     ui.advancedOffsetChoices?.addEventListener("click", handleOffsetChoiceClick);
     ui.offsetPrompt.addEventListener("click", handleOffsetPromptClick);
+    ui.optionsBody.addEventListener("click", handleStockOptionClick);
+    ui.optionsBody.addEventListener("keydown", handleStockOptionKeydown);
 
     ui.downloadImposition.addEventListener("click", downloadImposition);
     ui.emailImposition.addEventListener("click", emailImposition);
@@ -728,6 +763,7 @@
     state.productSearchSelection = null;
     state.productSearchQuery = "";
     ui.productSearch.value = "";
+    if (ui.filtersPanel instanceof HTMLDetailsElement) ui.filtersPanel.open = false;
     renderBrandSelector();
     renderClassSelector();
     renderLimitFilters();
@@ -796,6 +832,13 @@
   }
 
   function getConfiguratorTargetElements(target) {
+    if (target === "class") {
+      return {
+        scrollTarget: ui.classStep || ui.classSelector,
+        focusTarget: ui.classSelector?.querySelector("button")
+      };
+    }
+
     if (target === "product") {
       return {
         scrollTarget: ui.productSearchPanel || ui.productSearch,
@@ -804,6 +847,7 @@
     }
 
     if (target === "filters") {
+      if (ui.filtersPanel instanceof HTMLDetailsElement) ui.filtersPanel.open = true;
       return {
         scrollTarget: ui.filtersPanel,
         focusTarget: getFirstFocusableElement(ui.filtersPanel)
@@ -1827,6 +1871,12 @@
     const selectorState = getSelectorState();
     state.selectedProduct = selectorState.product;
     state.galleryProduct = selectorState.product || selectorState.previewProduct;
+    if (state.selectedStockQcode && !selectorState.product?.rolls?.some((roll) =>
+      String(roll.qcode || "").trim() === state.selectedStockQcode
+    )) {
+      state.selectedStockQcode = "";
+    }
+    updateProgressiveVisibility(selectorState, parsed.elements, parsed.errors);
     renderProductSearch();
     renderSelectorSurvey(selectorState);
     renderConfiguratorProgress(selectorState, parsed.elements);
@@ -1972,6 +2022,7 @@
         .filter((roll) => roll.qcode)
         .map((roll) => ({ widthMm: roll.width, qcode: roll.qcode })),
       printMode: product.printMode || "",
+      selectedQcode: state.selectedStockQcode || undefined,
       advancedOptions: settings,
       elements: elements.map((element) => ({
         shortname: element.shortname,
@@ -2147,7 +2198,8 @@
 
   function renderProductSearch() {
     const query = state.productSearchQuery.trim();
-    if (ui.filtersPanel) ui.filtersPanel.hidden = Boolean(query || state.productSearchSelection);
+    if (ui.filtersPanel) ui.filtersPanel.hidden = !shouldShowAdditionalFilters();
+    syncClassStepState();
     if (ui.productSearch.value !== state.productSearchQuery) {
       ui.productSearch.value = state.productSearchQuery;
     }
@@ -2447,24 +2499,24 @@
     const product = selectorState.product || selectorState.previewProduct;
     const hasProduct = Boolean(selectorState.product);
     const hasElements = elements.length > 0;
-    const activeFilterCount = getActiveFilterCount();
-    const filterSummary = getProgressFilterSummary(activeFilterCount);
+    const hasClassChoice = state.classFilters.size > 0;
+    const isDirectSearch = Boolean(state.productSearchQuery.trim() || state.productSearchSelection);
     const currentQuestion = selectorState.question
       ? getDisplaySelectorColumn(selectorState.question.label)
       : "Select";
 
     const steps = [
       {
-        label: "Product",
-        value: product?.name || currentQuestion,
-        status: hasProduct ? "complete" : "current",
-        target: "product"
+        label: "Class",
+        value: hasClassChoice ? `${state.classFilters.size} selected` : (hasProduct || isDirectSearch ? "Skipped" : "Choose"),
+        status: hasClassChoice || hasProduct ? "complete" : (isDirectSearch ? "neutral" : "current"),
+        target: "class"
       },
       {
-        label: "Filters",
-        value: filterSummary,
-        status: activeFilterCount ? "complete" : "neutral",
-        target: "filters"
+        label: "Product",
+        value: product?.name || (hasClassChoice || isDirectSearch ? currentQuestion : "Pending"),
+        status: hasProduct ? "complete" : (hasClassChoice || isDirectSearch ? "current" : "pending"),
+        target: "product"
       },
       {
         label: "Data",
@@ -2488,15 +2540,6 @@
     `).join("");
   }
 
-  function getProgressFilterSummary(activeFilterCount = getActiveFilterCount()) {
-    if (!activeFilterCount) return "Default";
-    const surface = state.mountingSurfaceFilter === MOUNTING_SURFACE_ALL
-      ? ""
-      : getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, state.mountingSurfaceFilter);
-    if (surface && activeFilterCount === 1) return `Surface: ${surface}`;
-    return `${activeFilterCount} active`;
-  }
-
   function renderConfiguratorGuidance(selectorState, elements = [], best = null) {
     if (!ui.configuratorGuidance) return;
     const hasProduct = Boolean(selectorState.product);
@@ -2509,18 +2552,19 @@
     let disabled = false;
 
     if (!selectorState.hasRows) {
+      ui.configuratorGuidance.hidden = false;
       title = "Loading product data";
       body = "The selector is waiting for the published Strapi catalogue.";
       status = "pending";
       disabled = true;
-    } else if (!state.classFilters.size) {
-      title = "Choose a class";
-      body = "Select one or more Class options to see matching SAV products.";
-      target = "filters";
+    } else if (!state.classFilters.size && !state.productSearchQuery.trim() && !state.productSearchSelection) {
+      ui.configuratorGuidance.hidden = true;
+      ui.configuratorGuidance.innerHTML = "";
+      return;
     } else if (!selectorState.candidates.length) {
       title = "No results found";
       body = "Clear filters or broaden the selection to see matching SAV products.";
-      target = "filters";
+      target = state.productSearchQuery.trim() ? "product" : "class";
     } else if (!hasProduct && selectorState.question) {
       const question = getDisplaySelectorColumn(selectorState.question.label);
       const count = selectorState.completeProductCount || selectorState.candidates.length;
@@ -2543,6 +2587,7 @@
       target = "result";
     }
 
+    ui.configuratorGuidance.hidden = false;
     ui.configuratorGuidance.className = `configurator-guidance ${status}${disabled ? " disabled" : ""}`;
     ui.configuratorGuidance.innerHTML = `
       <button class="configurator-guidance-button" type="button" data-configurator-guidance-target="${escapeHtml(target)}"${disabled ? " disabled" : ""}>
@@ -2622,6 +2667,34 @@
         </button>
       `;
     }).join("");
+    syncClassStepState();
+  }
+
+  function updateProgressiveVisibility(selectorState, elements = [], errors = []) {
+    const showAdditionalFilters = shouldShowAdditionalFilters();
+    const hasSelectedProduct = Boolean(selectorState.product);
+    const hasValidElements = errors.length === 0 && elements.length > 0;
+    const showJobResults = hasSelectedProduct && hasValidElements;
+
+    if (ui.filtersPanel) ui.filtersPanel.hidden = !showAdditionalFilters;
+    if (ui.advancedOptionsConfig) ui.advancedOptionsConfig.hidden = !hasSelectedProduct;
+    if (ui.artworkConfig) ui.artworkConfig.hidden = !showJobResults;
+    if (ui.outputWorkflow) ui.outputWorkflow.hidden = !showJobResults;
+    if (ui.appShell) ui.appShell.classList.toggle("is-input-only", !showJobResults);
+  }
+
+  function shouldShowAdditionalFilters() {
+    return state.classFilters.size > 0 && !(
+      state.productSearchQuery.trim() ||
+      state.productSearchSelection
+    );
+  }
+
+  function syncClassStepState() {
+    const awaitingClass = !state.classFilters.size &&
+      !state.productSearchQuery.trim() &&
+      !state.productSearchSelection;
+    ui.classStep?.classList.toggle("is-active", awaitingClass);
   }
 
   function renderLimitFilters() {
@@ -4402,9 +4475,9 @@
             <strong>Print Options</strong>
             ${printOptions.length === 1 ? `<span>Automatically selected</span>` : ""}
           </div>
-          <div class="choice-grid product-option-choices">
+          <div class="print-mode-radio-list" role="radiogroup" aria-label="Print Options">
             ${printOptions.length ? printOptions.map((option) =>
-              renderProductOptionButton(PRINT_MODE_COLUMN, option.label, selectedPrintMode?.label)
+              renderPrintModeRadioOption(option.label, selectedPrintMode?.label)
             ).join("") : `<div class="product-option-empty">No print option configured</div>`}
           </div>
         </div>
@@ -4414,10 +4487,10 @@
               <strong>Laminate</strong>
               ${laminateChoices.length === 1 ? `<span>Automatically selected</span>` : ""}
             </div>
-            <div class="choice-grid product-option-choices">
+            <div class="laminate-radio-list" role="radiogroup" aria-label="Laminate">
               ${laminateChoices.length ? laminateChoices.map((choice) =>
-                renderProductOptionButton(LAMINATE_COLUMN, choice, selectedLaminate)
-              ).join("") : `<div class="choice-button selected product-option-static" aria-pressed="true">No laminate</div>`}
+                renderLaminateRadioOption(choice, selectedLaminate)
+              ).join("") : renderLaminateRadioOption(NO_LAMINATE_VALUE, NO_LAMINATE_VALUE, true)}
             </div>
           </div>
         ` : ""}
@@ -4425,9 +4498,24 @@
     `;
   }
 
-  function renderProductOptionButton(column, value, selectedValue) {
+  function renderPrintModeRadioOption(value, selectedValue) {
     const selected = normalizeKey(value) === normalizeKey(selectedValue);
-    return `<button class="choice-button${selected ? " selected" : ""}" type="button" data-selector-column="${escapeHtml(column)}" data-selector-value="${escapeHtml(value)}" aria-pressed="${selected ? "true" : "false"}">${escapeHtml(getDisplaySelectorValue(column, value))}</button>`;
+    return `
+      <label class="print-mode-radio-option${selected ? " selected" : ""}" data-selector-column="${escapeHtml(PRINT_MODE_COLUMN)}" data-selector-value="${escapeHtml(value)}">
+        <input type="radio" name="product-print-mode" value="${escapeHtml(value)}"${selected ? " checked" : ""}>
+        <span>${escapeHtml(getDisplaySelectorValue(PRINT_MODE_COLUMN, value))}</span>
+      </label>
+    `;
+  }
+
+  function renderLaminateRadioOption(value, selectedValue, disabled = false) {
+    const selected = normalizeKey(value) === normalizeKey(selectedValue);
+    return `
+      <label class="laminate-radio-option${selected ? " selected" : ""}" data-selector-column="${escapeHtml(LAMINATE_COLUMN)}" data-selector-value="${escapeHtml(value)}">
+        <input type="radio" name="product-laminate" value="${escapeHtml(value)}"${selected ? " checked" : ""}${disabled ? " disabled" : ""}>
+        <span>${escapeHtml(getDisplaySelectorValue(LAMINATE_COLUMN, value))}</span>
+      </label>
+    `;
   }
 
   function getProductWorkflowRows(selectorState, productName) {
@@ -4641,10 +4729,25 @@
 
   function renderOpenGraphPreviewShell(url) {
     if (isDirectImageUrl(url)) return renderImagePreviewShell(url);
+    if (isDirectPdfUrl(url)) return renderPdfPreviewShell(url);
 
     return `
       <a class="og-preview" href="${escapeHtml(url)}" target="_blank" rel="noopener" data-og-preview-url="${escapeHtml(url)}">
         ${renderOpenGraphPreviewContent(buildFallbackLinkPreview(url))}
+      </a>
+    `;
+  }
+
+  function renderPdfPreviewShell(url) {
+    const preview = buildFallbackLinkPreview(url);
+    return `
+      <a class="og-preview pdf-preview" href="${escapeHtml(url)}" target="_blank" rel="noopener" aria-label="Open PDF document">
+        <span class="og-preview-media pdf-preview-media">${renderPdfIcon()}</span>
+        <span class="og-preview-body">
+          <span class="og-preview-site">${escapeHtml(preview.siteName || getReadableHost(url))}</span>
+          <span class="og-preview-title">${escapeHtml(preview.title || "PDF document")}</span>
+          <span class="og-preview-description">PDF document</span>
+        </span>
       </a>
     `;
   }
@@ -4781,6 +4884,12 @@
     const parsed = safeParseUrl(value);
     if (!parsed || !/^https?:$/.test(parsed.protocol)) return false;
     return /\.(avif|bmp|gif|jpe?g|png|svg|webp)$/i.test(parsed.pathname);
+  }
+
+  function isDirectPdfUrl(value) {
+    const parsed = safeParseUrl(value);
+    if (!parsed || !/^https?:$/.test(parsed.protocol)) return false;
+    return /\.pdf$/i.test(parsed.pathname);
   }
 
   function safeParseUrl(value) {
@@ -5015,12 +5124,16 @@
   function renderOptions(options, best) {
     ui.optionCount.textContent = `${options.length} stock widths`;
     ui.optionsBody.innerHTML = options.map((option) => {
-      const selected = String(option.roll.qcode || "") === String(best.roll.qcode || "") ? " class=\"selected-row\"" : "";
+      const qcode = String(option.roll.qcode || "").trim();
+      const isSelected = qcode === String(best.roll.qcode || "").trim();
+      const rowAttributes = qcode
+        ? ` class="stock-option-row${isSelected ? " selected-row" : ""}" data-stock-qcode="${escapeHtml(qcode)}" tabindex="0" aria-selected="${isSelected ? "true" : "false"}" title="Select this stock width"`
+        : "";
       const offsetText = option.offsetSaves
         ? `${formatNumber(option.offsetPack.lengthMm / 1000, 2)} m`
         : "No saving";
       return `
-        <tr${selected}>
+        <tr${rowAttributes}>
           <td>${escapeHtml(formatRollWidthLabel(option.roll))}</td>
           <td><code>${escapeHtml(option.roll.qcode || "—")}</code></td>
           <td>${escapeHtml(formatStockQoh(option.roll.qohProduct))}</td>
@@ -5032,6 +5145,25 @@
         </tr>
       `;
     }).join("");
+  }
+
+  function handleStockOptionClick(event) {
+    selectStockOptionRow(event.target.closest("[data-stock-qcode]"));
+  }
+
+  function handleStockOptionKeydown(event) {
+    if (!["Enter", " "].includes(event.key)) return;
+    const row = event.target.closest("[data-stock-qcode]");
+    if (!row) return;
+    event.preventDefault();
+    selectStockOptionRow(row);
+  }
+
+  function selectStockOptionRow(row) {
+    const qcode = String(row?.dataset.stockQcode || "").trim();
+    if (!qcode || qcode === state.selectedStockQcode) return;
+    state.selectedStockQcode = qcode;
+    recalculate();
   }
 
   function renderPricing(best, elements) {

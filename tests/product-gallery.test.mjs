@@ -50,6 +50,13 @@ test("opens guidance image previews in the controlled product gallery", () => {
   assert.doesNotMatch(app, /<a class="og-preview image-preview"[^>]+target="_blank"/);
 });
 
+test("shows the Product Data PDF icon for linked PDF documents", () => {
+  assert.match(app, /if \(isDirectPdfUrl\(url\)\) return renderPdfPreviewShell\(url\);/);
+  assert.match(app, /function renderPdfPreviewShell\(url\)[\s\S]*?class="og-preview-media pdf-preview-media">\$\{renderPdfIcon\(\)\}/);
+  assert.match(app, /function isDirectPdfUrl\(value\)[\s\S]*?\/\\\.pdf\$\/i\.test\(parsed\.pathname\)/);
+  assert.match(styles, /\.og-preview-media \.pdf-icon\s*\{[\s\S]*?width: 28px;[\s\S]*?height: 34px;/);
+});
+
 test("selecting every visible class includes blank or unrecognised product classes", () => {
   assert.match(app, /classOptions\.every\(\(option\) => state\.classFilters\.has\(option\.id\)\)\) return true;/);
   assert.match(app, /if \(!state\.classFilters\.size\) return false;/);
@@ -68,6 +75,11 @@ test("product search treats no selected classes as all classes", () => {
 });
 
 test("product search keeps filters hidden while typing and after selecting a result", () => {
-  assert.match(app, /function renderProductSearch\(\) \{\s*const query = state\.productSearchQuery\.trim\(\);\s*if \(ui\.filtersPanel\) ui\.filtersPanel\.hidden = Boolean\(query \|\| state\.productSearchSelection\);/);
+  assert.match(app, /function renderProductSearch\(\) \{\s*const query = state\.productSearchQuery\.trim\(\);\s*if \(ui\.filtersPanel\) ui\.filtersPanel\.hidden = !shouldShowAdditionalFilters\(\);/);
+  assert.match(app, /function shouldShowAdditionalFilters\(\) \{\s*return state\.classFilters\.size > 0 && !\([\s\S]*?state\.productSearchQuery\.trim\(\)[\s\S]*?state\.productSearchSelection/);
   assert.match(app, /function applyProductSearchSelection\(resultIndex\)[\s\S]*?state\.productSearchSelection = \{[\s\S]*?state\.productSearchQuery = "";[\s\S]*?recalculate\(\);/);
+});
+
+test("product-search selections retain print and laminate radio choices", () => {
+  assert.match(app, /const shouldKeepSearchSelection = Boolean\(state\.productSearchSelection\)[\s\S]*?const updatedSelections = \{[\s\S]*?\[column\]: choice\.dataset\.selectorValue[\s\S]*?state\.productSearchSelection\.selections = updatedSelections;[\s\S]*?state\.selectorSelections = \{ \.\.\.updatedSelections \};/);
 });

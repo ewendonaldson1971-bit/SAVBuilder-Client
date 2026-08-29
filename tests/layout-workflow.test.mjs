@@ -66,15 +66,73 @@ test("starts and resets with every class filter unselected", () => {
   assert.equal((app.match(/state\.classFilters = new Set\(\);/g) || []).length, 2);
 });
 
-test("does not show an empty-state pill before a class is selected", () => {
-  assert.match(app, /title = "Choose a class"/);
+test("places the first-step class controls beside their instruction", () => {
+  assert.match(html, /id="class-step"[\s\S]*?Start here[\s\S]*?Choose a product class[\s\S]*?id="class-selector"/);
+  assert.ok(html.indexOf('id="class-step"') < html.indexOf('class="product-search"'));
+  assert.match(app, /target === "class"/);
+  assert.match(app, /label: "Class"[\s\S]*?target: "class"[\s\S]*?label: "Product"/);
+  assert.match(css, /\.class-step\.is-active\s*\{[\s\S]*?border-color: #348ede;[\s\S]*?box-shadow:/);
+});
+
+test("provides a discreet Strapi shortcut at the right of the header", () => {
+  const imposition = html.indexOf('class="imposition-actions"');
+  const strapi = html.indexOf('class="strapi-admin-link"');
+  assert.ok(imposition >= 0 && strapi > imposition);
+  assert.match(html, /class="strapi-admin-link"[\s\S]*?href="https:\/\/strapi\.vivad\.com\.au\/admin\/content-manager\/collection-types\/api::sav-builder-option\.sav-builder-option\?pageSize=10"[\s\S]*?target="_blank"[\s\S]*?aria-label="Open SAV Builder products in Strapi"/);
+  assert.match(css, /\.strapi-admin-link\s*\{[\s\S]*?flex: 0 0 32px;[\s\S]*?opacity: 0\.66;/);
+});
+
+test("hides secondary configuration and result stages on initial load", () => {
+  assert.match(html, /<details class="filters-panel"[^>]*hidden>/);
+  assert.match(html, /id="advanced-options-config" hidden>/);
+  assert.match(html, /id="artwork-config"[^>]*hidden>/);
+  assert.match(html, /class="workflow-column output-workflow"[^>]*hidden>/);
+  assert.match(app, /function updateProgressiveVisibility\(selectorState, elements = \[\], errors = \[\]\)/);
+  assert.match(app, /const showJobResults = hasSelectedProduct && hasValidElements;/);
+  assert.match(css, /\.app-shell\.is-input-only\s*\{[\s\S]*?grid-template-columns: minmax\(360px, 760px\);/);
+});
+
+test("does not duplicate initial class guidance away from its controls", () => {
+  assert.match(app, /!state\.classFilters\.size && !state\.productSearchQuery\.trim\(\) && !state\.productSearchSelection[\s\S]*?ui\.configuratorGuidance\.hidden = true;/);
   assert.match(app, /function renderSelectorEmptyState\(selectorState\) \{\s*if \(!state\.classFilters\.size\) return "";/);
   assert.doesNotMatch(app, /Choose a class to see matching SAV products\./);
   assert.doesNotMatch(css, /\.survey-empty\.neutral/);
 });
 
-test("orders Class above Brand and Mounting Surface", () => {
-  assert.match(html, /class="class-filter"[\s\S]*?id="class-selector"[\s\S]*?class="brand-filter"[\s\S]*?id="brand-selector"[\s\S]*?class="mounting-filter"[\s\S]*?id="mounting-surface-selector"/);
+test("keeps optional filters in a collapsed disclosure between class and search", () => {
+  assert.match(html, /<details class="filters-panel"[\s\S]*?Additional filters[\s\S]*?class="brand-filter"[\s\S]*?id="brand-selector"[\s\S]*?class="mounting-filter"[\s\S]*?id="mounting-surface-selector"[\s\S]*?<\/details>/);
+  assert.ok(html.indexOf('id="class-step"') < html.indexOf('class="filters-panel"'));
+  assert.ok(html.indexOf('class="filters-panel"') < html.indexOf('class="product-search"'));
+  assert.doesNotMatch(html, /class="filters-panel"[\s\S]*?class="class-filter"/);
+});
+
+test("renders laminate choices as a vertical radio group", () => {
+  assert.match(app, /class="laminate-radio-list" role="radiogroup" aria-label="Laminate"/);
+  assert.match(app, /function renderLaminateRadioOption\([\s\S]*?type="radio" name="product-laminate"/);
+  assert.doesNotMatch(app, /renderProductOptionButton\(LAMINATE_COLUMN, choice, selectedLaminate\)/);
+  assert.match(css, /\.laminate-radio-list\s*\{[\s\S]*?display: grid;[\s\S]*?gap: 8px;/);
+  assert.match(css, /\.laminate-radio-option input\s*\{[\s\S]*?accent-color: var\(--vivad-blue\);/);
+});
+
+test("renders print options as a vertical radio group", () => {
+  assert.match(app, /class="print-mode-radio-list" role="radiogroup" aria-label="Print Options"/);
+  assert.match(app, /function renderPrintModeRadioOption\([\s\S]*?type="radio" name="product-print-mode"/);
+  assert.doesNotMatch(app, /renderProductOptionButton\(PRINT_MODE_COLUMN/);
+  assert.match(css, /\.print-mode-radio-list,[\s\S]*?\.laminate-radio-list\s*\{[\s\S]*?display: grid;[\s\S]*?gap: 8px;/);
+  assert.match(css, /\.print-mode-radio-option input,[\s\S]*?\.laminate-radio-option input\s*\{[\s\S]*?accent-color: var\(--vivad-blue\);/);
+  assert.match(app, /ui\.selectorSurvey\.addEventListener\("change",[\s\S]*?input\[type="radio"\][\s\S]*?applySelectorChoice\(choice\)/);
+});
+
+test("lets users select an authoritative stock option by row", () => {
+  assert.match(app, /selectedStockQcode: ""/);
+  assert.match(app, /selectedQcode: state\.selectedStockQcode \|\| undefined/);
+  assert.match(app, /data-stock-qcode="\$\{escapeHtml\(qcode\)\}" tabindex="0" aria-selected=/);
+  assert.match(app, /ui\.optionsBody\.addEventListener\("click", handleStockOptionClick\)/);
+  assert.match(app, /ui\.optionsBody\.addEventListener\("keydown", handleStockOptionKeydown\)/);
+  assert.match(app, /const qcode = String\(quote\?\.source\?\.qcode \|\| ""\)\.trim\(\)/);
+  assert.match(app, /state\.currentBest = best;[\s\S]*?renderResults\(best, ranked, elements\)/);
+  assert.match(app, /renderOptions\(options, best\);[\s\S]*?renderPricing\(best, elements\);[\s\S]*?renderImposition\(best\);/);
+  assert.match(css, /\.stock-option-row\s*\{[\s\S]*?cursor: pointer;/);
 });
 
 test("matches the Mounting Surface control shape to the Brand control", () => {
