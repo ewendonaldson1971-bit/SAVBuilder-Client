@@ -59,12 +59,25 @@
 
     <main class="app-shell">
       <div class="workflow-column input-workflow" aria-label="Configure SAV job">
+      <section id="sav-family-panel" class="family-panel surface" aria-labelledby="sav-family-title" hidden>
+        <div class="section-heading family-panel-heading">
+          <div class="heading-title">
+            <span class="family-panel-kicker">Quick start</span>
+            <h2 id="sav-family-title">Choose a product family</h2>
+            <p>Browse SAV product families independently from the Advanced Selector.</p>
+          </div>
+        </div>
+        <div id="sav-family-cards" class="sav-family-cards" aria-live="polite"></div>
+      </section>
+
+      <section id="sav-family-detail" class="sav-family-detail" aria-live="polite" hidden></section>
+
       <section class="setup-panel surface" aria-labelledby="setup-title">
         <div class="section-heading">
           <div class="heading-title">
-            <h2 id="setup-title">Product Selector</h2>
-            <span class="help-tooltip" data-help="Use the Product Selector to choose the right SAV for your application. You can search by QCode, product name, brand, mounting surface and laminate. Use the Mounting Surface, Brand, Class and Properties filters to assist with your product selection. The app will either tile or panel your job according to the size of the job and the stock width.">
-              <button class="help-button" type="button" aria-label="Product Selector help: Use the Product Selector to choose the right SAV for your application. You can search by QCode, product name, brand, mounting surface and laminate. Use the Mounting Surface, Brand, Class and Properties filters to assist with your product selection. The app will either tile or panel your job according to the size of the job and the stock width.">?</button>
+            <h2 id="setup-title">Advanced Selector</h2>
+            <span class="help-tooltip" data-help="Use the Advanced Selector to choose a specific SAV without using a product family. You can search by QCode, product name, brand, mounting surface and laminate, or use the filters to narrow the catalogue.">
+              <button class="help-button" type="button" aria-label="Advanced Selector help: Use the Advanced Selector to choose a specific SAV without using a product family. You can search by QCode, product name, brand, mounting surface and laminate, or use the filters to narrow the catalogue.">?</button>
             </span>
           </div>
         </div>

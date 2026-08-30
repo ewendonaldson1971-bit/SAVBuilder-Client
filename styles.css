@@ -201,6 +201,10 @@ h2 {
   grid-template-columns: minmax(360px, 760px);
 }
 
+.app-shell.is-family-detail {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .workflow-column {
   display: grid;
   min-width: 0;
@@ -417,6 +421,496 @@ h2 {
   align-items: end;
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.family-panel {
+  display: grid;
+  gap: 13px;
+}
+
+.family-panel[hidden] {
+  display: none;
+}
+
+.family-panel-heading {
+  align-items: start;
+}
+
+.family-panel-heading .heading-title {
+  display: grid;
+  gap: 3px;
+}
+
+.family-panel-heading h2,
+.family-panel-heading p {
+  margin: 0;
+}
+
+.family-panel-heading p {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.family-panel-kicker {
+  color: #1d5f9f;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sav-family-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sav-family-card {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  min-height: 108px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.sav-family-card:hover {
+  border-color: var(--vivad-blue-hover);
+  box-shadow: 0 8px 20px rgba(29, 95, 159, 0.12);
+  transform: translateY(-1px);
+}
+
+.sav-family-card:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.sav-family-card.selected {
+  border-color: var(--vivad-blue);
+  background: #eef7ff;
+  box-shadow: 0 0 0 3px rgba(52, 142, 222, 0.14);
+}
+
+.sav-family-card-media {
+  display: grid;
+  place-items: center;
+  width: 86px;
+  height: 86px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--surface-alt);
+}
+
+.sav-family-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sav-family-card-media.fallback {
+  background: linear-gradient(145deg, #eaf4ff, #f7fbff);
+  color: #1d5f9f;
+  font-family: var(--font-heading);
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.sav-family-card-content {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sav-family-card-content strong {
+  font-family: var(--font-heading);
+  font-size: 0.96rem;
+  line-height: 1.25;
+}
+
+.sav-family-card-brand,
+.sav-family-card-summary,
+.sav-family-card-surfaces,
+.sav-family-card-description {
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.sav-family-card-description {
+  margin-top: 2px;
+}
+
+.sav-family-card-brand {
+  color: #1d5f9f;
+  font-weight: 700;
+}
+
+.sav-family-card-action {
+  align-self: end;
+  color: var(--vivad-blue-deep);
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sav-family-detail {
+  padding: clamp(8px, 1vw, 16px) clamp(4px, 1vw, 12px) 18px;
+}
+
+.family-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.family-breadcrumbs button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--vivad-blue);
+  cursor: pointer;
+}
+
+.family-breadcrumbs button:hover,
+.family-breadcrumbs button:focus-visible {
+  color: var(--vivad-blue-deep);
+  text-decoration: underline;
+  outline: none;
+}
+
+.family-detail-heading {
+  margin-bottom: 28px;
+}
+
+.family-detail-heading::before {
+  display: block;
+  width: 58px;
+  height: 5px;
+  margin-bottom: 14px;
+  background: var(--green);
+  content: "";
+}
+
+.family-detail-brand {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--green);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.family-detail-heading h2 {
+  color: var(--muted);
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  line-height: 1.05;
+}
+
+.family-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.92fr) minmax(420px, 1.08fr);
+  align-items: start;
+  gap: clamp(28px, 5vw, 70px);
+}
+
+.family-detail-product {
+  min-width: 0;
+}
+
+.family-detail-image {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: clamp(340px, 42vw, 535px);
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #eaf4ff, #f7fbff);
+  color: #1d5f9f;
+  font: 700 4rem/1 var(--font-heading);
+}
+
+.family-detail-image.has-image:not(:disabled) {
+  cursor: zoom-in;
+}
+
+.family-detail-image img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.family-detail-image small {
+  position: absolute;
+  z-index: 1;
+  bottom: 18px;
+  left: 18px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--vivad-blue-deep);
+  font: 700 0.68rem/1 var(--font-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.family-detail-about {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.family-detail-about h3,
+.family-detail-about p {
+  margin: 0;
+}
+
+.family-detail-about h3 {
+  margin-bottom: 9px;
+  font: 700 1rem/1.3 var(--font-heading);
+}
+
+.family-detail-about p {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.family-detail-about .family-detail-option-name {
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.family-config-panel {
+  padding: clamp(22px, 3.5vw, 38px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 44px rgba(33, 37, 41, 0.10);
+}
+
+.family-config-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.family-config-title h3,
+.family-config-title p {
+  margin: 0;
+}
+
+.family-config-title h3 {
+  color: var(--muted);
+  font: 700 1.45rem/1.2 var(--font-heading);
+}
+
+.family-config-title p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.family-config-title > span {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.family-option-group {
+  padding: 23px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.family-option-group > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.family-option-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+
+.family-option-label span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.family-radio-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+}
+
+.family-radio-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.family-variant-help {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.family-variant-help > button {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  border: 1px solid var(--vivad-blue);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--vivad-blue-deep);
+  font: 700 0.68rem/1 var(--font-ui);
+  cursor: help;
+  box-shadow: none;
+}
+
+.family-variant-help > button:hover,
+.family-variant-help > button:focus-visible {
+  border-color: var(--vivad-blue-hover);
+  background: #eaf4ff;
+  outline: none;
+}
+
+.family-variant-help-content {
+  position: absolute;
+  z-index: 30;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  width: max-content;
+  max-width: min(280px, calc(100vw - 32px));
+  padding: 9px 11px;
+  border: 1px solid #cbd9e8;
+  border-radius: 8px;
+  background: #162435;
+  color: #fff;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  visibility: hidden;
+  box-shadow: 0 10px 28px rgb(24 52 82 / 22%);
+}
+
+.family-variant-help:hover .family-variant-help-content,
+.family-variant-help:focus-within .family-variant-help-content,
+.family-variant-help.open .family-variant-help-content {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  visibility: visible;
+}
+
+.family-variant-empty {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.family-radio-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.family-radio-option input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  accent-color: var(--vivad-blue);
+  cursor: pointer;
+}
+
+.family-radio-option input:focus {
+  border: 0;
+  box-shadow: none;
+  outline: 2px solid rgba(52, 139, 226, 0.24);
+  outline-offset: 2px;
+}
+
+.family-radio-option.selected span {
+  color: var(--vivad-blue-deep);
+  font-weight: 700;
+}
+
+.family-radio-option.disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.family-print-mode select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: var(--control-shadow);
+}
+
+.family-selection-result {
+  display: grid;
+  gap: 4px;
+  margin-top: 22px;
+  padding: 15px 16px;
+  border-radius: 10px;
+  background: var(--surface-alt);
+}
+
+.family-selection-result span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.family-selection-result strong {
+  color: var(--muted);
+  font-family: var(--font-heading);
 }
 
 .class-step {
@@ -2530,6 +3024,10 @@ tbody tr.selected-row {
     grid-template-columns: 1fr;
   }
 
+  .family-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
   .output-workflow {
     position: static;
     max-height: none;
@@ -3249,6 +3747,24 @@ th,
 }
 
 @media (max-width: 760px) {
+  .sav-family-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .sav-family-card {
+    grid-template-columns: 72px minmax(0, 1fr);
+    min-height: 92px;
+  }
+
+  .sav-family-card-media {
+    width: 72px;
+    height: 72px;
+  }
+
+  .sav-family-card-action {
+    display: none;
+  }
+
   .element-table-panel {
     grid-template-columns: 1fr;
     gap: 10px;

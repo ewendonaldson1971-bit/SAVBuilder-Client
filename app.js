@@ -167,6 +167,7 @@
 
   const state = {
     selectorRows: [],
+    familyRows: [],
     selectorColumns: [],
     postProductSelectorColumns: [],
     selectorSelections: {},
@@ -179,6 +180,11 @@
     galleryProduct: null,
     productSearchQuery: "",
     productSearchResults: [],
+    familyCardResults: [],
+    selectedFamilyId: "",
+    familyDetailOpen: false,
+    familyVariantSelections: {},
+    familyPrintMode: "",
     productSearchSelection: null,
     productSource: "strapi",
     useOffsetJoins: null,
@@ -218,7 +224,7 @@
   function init() {
     cacheUi();
     applyAppMode();
-    applySelectorData({ rows: [], selectorColumns: [], postProductSelectorColumns: [LAMINATE_COLUMN] }, "strapi");
+    applySelectorData({ rows: [], familyRows: [], selectorColumns: [], postProductSelectorColumns: [LAMINATE_COLUMN] }, "strapi");
     ui.jobInput.value = "";
     renderElementTableFromText();
     renderBrandSelector();
@@ -238,6 +244,10 @@
     ui.configuratorProgress = document.getElementById("configurator-progress");
     ui.configuratorGuidance = document.getElementById("configurator-guidance");
     ui.advancedConfigStatus = document.getElementById("advanced-config-status");
+    ui.familyPanel = document.getElementById("sav-family-panel");
+    ui.familyCards = document.getElementById("sav-family-cards");
+    ui.familyDetail = document.getElementById("sav-family-detail");
+    ui.setupPanel = document.querySelector(".setup-panel");
     ui.classStep = document.getElementById("class-step");
     ui.productSearchPanel = document.querySelector(".product-search");
     ui.filtersPanel = document.querySelector(".filters-panel");
@@ -394,6 +404,57 @@
       applyProductSearchSelection(Number.parseInt(result.dataset.productSearchIndex, 10));
     });
 
+    ui.familyCards?.addEventListener("click", (event) => {
+      const card = event.target.closest("[data-sav-family-index]");
+      if (!card) return;
+      applySavFamilySelection(Number.parseInt(card.dataset.savFamilyIndex, 10));
+    });
+
+    ui.familyDetail?.addEventListener("click", (event) => {
+      const variantHelp = event.target.closest("[data-family-variant-help]");
+      if (variantHelp) {
+        event.preventDefault();
+        event.stopPropagation();
+        const help = variantHelp.closest(".family-variant-help");
+        const shouldOpen = !help?.classList.contains("open");
+        closeSavFamilyVariantHelp();
+        if (shouldOpen && help) {
+          help.classList.add("open");
+          variantHelp.setAttribute("aria-expanded", "true");
+        }
+        return;
+      }
+      if (event.target.closest("[data-family-back]")) {
+        closeSavFamilyDetail();
+        return;
+      }
+      if (event.target.closest("[data-family-gallery-open]")) {
+        openProductGallery(state.galleryProduct);
+      }
+    });
+
+    ui.familyDetail?.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      const openHelp = ui.familyDetail.querySelector(".family-variant-help.open");
+      if (!openHelp) return;
+      const trigger = openHelp.querySelector("[data-family-variant-help]");
+      closeSavFamilyVariantHelp();
+      trigger?.focus();
+    });
+
+    ui.familyDetail?.addEventListener("change", (event) => {
+      const variant = event.target.closest("[data-family-variant]");
+      if (variant) {
+        applySavFamilyVariant(variant.dataset.familyVariant, variant.value);
+        return;
+      }
+      const printMode = event.target.closest("[data-family-print-mode]");
+      if (printMode) {
+        state.familyPrintMode = printMode.value;
+        recalculate();
+      }
+    });
+
     ui.resetSurvey.addEventListener("click", resetSurveyAndFilters);
 
     ui.brandSelector.addEventListener("click", (event) => {
@@ -427,6 +488,11 @@
     document.addEventListener("click", (event) => {
       if (ui.brandSelector.contains(event.target)) return;
       ui.brandSelector.querySelector("details")?.removeAttribute("open");
+    });
+
+    document.addEventListener("click", (event) => {
+      if (event.target.closest(".family-variant-help")) return;
+      closeSavFamilyVariantHelp();
     });
 
     ui.classSelector.addEventListener("click", (event) => {
@@ -1496,8 +1562,16 @@
 
   function buildSelectorDataFromStrapi(catalog) {
     const normalized = normalizeSavCatalog(catalog);
-    const catalogEntries = normalized.entries;
-    const rows = catalogEntries.flatMap((entry) => {
+    return {
+      rows: buildSelectorRowsFromStrapiEntries(normalized.optionEntries),
+      familyRows: buildSelectorRowsFromStrapiEntries(normalized.familyEntries),
+      selectorColumns: [],
+      postProductSelectorColumns: [LAMINATE_COLUMN]
+    };
+  }
+
+  function buildSelectorRowsFromStrapiEntries(entries) {
+    return entries.flatMap((entry) => {
       const rollOptions = (Array.isArray(entry?.rollOptions) ? entry.rollOptions : [])
         .map((roll) => ({
           width: Number(roll?.widthMm),
@@ -1514,36 +1588,22 @@
         : [{ surface: "", description: "", link: "" }];
       return guidance.map((surfaceInfo) => buildSelectorRowFromStrapi(entry, surfaceInfo, rollOptions));
     });
-    return {
-      rows,
-      selectorColumns: [],
-      postProductSelectorColumns: normalized.postProductSelectorColumns
-    };
   }
 
   function normalizeSavCatalog(catalog) {
     if (Array.isArray(catalog)) {
-      return { entries: catalog, postProductSelectorColumns: [LAMINATE_COLUMN] };
+      return { optionEntries: catalog.map(unwrapStrapiEntity), familyEntries: [] };
     }
 
-    const options = Array.isArray(catalog?.options) ? catalog.options : [];
+    const optionEntries = (Array.isArray(catalog?.options) ? catalog.options : []).map(unwrapStrapiEntity);
     const families = Array.isArray(catalog?.families) ? catalog.families : [];
-    const linkedOptionIds = new Set();
     const familyEntries = [];
-    const variantColumns = [];
 
     families.forEach((familyRecord) => {
       const family = unwrapStrapiEntity(familyRecord);
       const definitions = getSavFamilyVariantDefinitions(family);
-      definitions.forEach((definition) => {
-        if (!variantColumns.some((column) => normalizeKey(column) === normalizeKey(definition.column))) {
-          variantColumns.push(definition.column);
-        }
-      });
 
       getStrapiRelationItems(family.options).forEach((option) => {
-        const optionId = String(option.documentId || option.id || "").trim();
-        if (optionId) linkedOptionIds.add(optionId);
         const variantSelections = resolveSavFamilyVariantSelections(definitions, option);
         const optionSurfaceGuidance = getStrapiRelationItems(option.surfaceGuidance);
         const familySurfaceGuidance = getStrapiRelationItems(family.surfaceGuidance);
@@ -1552,8 +1612,10 @@
           ...option,
           documentId: option.documentId || option.id || "",
           familyDocumentId: family.documentId || family.id || "",
+          optionName: option.productName || "",
           productName: family.productName || option.productName || "",
           brand: family.brand || option.brand || "",
+          cardDescription: family.cardDescription || "",
           sourceKey: option.sourceKey || family.sourceKey || "",
           sortOrder: Number(family.sortOrder ?? option.sortOrder) || 0,
           optionSortOrder: Number(option.sortOrder) || 0,
@@ -1561,7 +1623,7 @@
           productSpecSheet: getPreferredStrapiMediaRelation(option.productSpecSheet, family.productSpecSheet),
           productSpecSheetUrl: option.productSpecSheetUrl || family.productSpecSheetUrl || "",
           galleryImages: getPreferredStrapiMediaRelation(option.galleryImages, family.galleryImages),
-          generalDescription: option.generalDescription || family.generalDescription || "",
+          generalDescription: family.generalDescription || option.generalDescription || "",
           generalImage: getPreferredStrapiMediaRelation(option.generalImage, family.generalImage),
           generalLink: option.generalLink || family.generalLink || "",
           generalLink2: option.generalLink2 || family.generalLink2 || "",
@@ -1571,31 +1633,18 @@
           laminateSpecSheetUrl: option.laminateSpecSheetUrl,
           availablePrintModes: option.availablePrintModes || {},
           rollOptions: option.rollOptions || [],
-          variantSelections
+          variantSelections,
+          familyVariantColumns: definitions.map((definition) => definition.column),
+          familyVariantHelp: definitions.flatMap((definition) => definition.values.map((value) => ({
+            column: definition.column,
+            label: value.label || value.matchValue,
+            helpText: value.helpText
+          }))).filter((value) => value.label && value.helpText)
         });
       });
     });
 
-    const legacyEntries = options
-      .map(unwrapStrapiEntity)
-      .filter((option) => {
-        const optionId = String(option.documentId || option.id || "").trim();
-        return !optionId || !linkedOptionIds.has(optionId);
-      });
-    const hasLaminate = [...familyEntries, ...legacyEntries].some((entry) =>
-      String(entry.laminateName || entry.variantSelections?.[LAMINATE_COLUMN] || "").trim()
-    );
-    const postProductSelectorColumns = [...variantColumns];
-    if (hasLaminate && !postProductSelectorColumns.some(isLaminateColumnName)) {
-      postProductSelectorColumns.unshift(LAMINATE_COLUMN);
-    }
-
-    return {
-      entries: [...familyEntries, ...legacyEntries],
-      postProductSelectorColumns: postProductSelectorColumns.length
-        ? postProductSelectorColumns
-        : [LAMINATE_COLUMN]
-    };
+    return { optionEntries, familyEntries };
   }
 
   function unwrapStrapiEntity(value) {
@@ -1624,7 +1673,12 @@
         name: String(definition.name || "").trim(),
         column: getSavFamilyVariantColumnName(definition.name),
         sortOrder: Number(definition.sortOrder) || 0,
-        values: getStrapiRelationItems(definition.values)
+        values: getStrapiRelationItems(definition.values).map((value) => ({
+          ...value,
+          label: String(value.label || "").trim(),
+          matchValue: String(value.matchValue || "").trim(),
+          helpText: String(value.helpText || "").trim()
+        }))
       }))
       .filter((definition) => definition.name)
       .sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name));
@@ -1644,9 +1698,6 @@
       );
       selections[definition.column] = String(configuredValue?.label || matchValue).trim();
     });
-    if (!selections[LAMINATE_COLUMN] && option?.laminateName) {
-      selections[LAMINATE_COLUMN] = String(option.laminateName).trim();
-    }
     return selections;
   }
 
@@ -1690,6 +1741,7 @@
       galleryImages: getStrapiMediaItems(entry.galleryImages),
       generalImage: getStrapiMediaItems(entry.generalImage)[0] || null,
       [GENERAL_DESCRIPTION_COLUMN]: String(entry.generalDescription || "").trim(),
+      savFamilyCardDescription: String(entry.cardDescription || "").trim(),
       [GENERAL_LINK_COLUMN]: String(entry.generalLink || "").trim(),
       "Surface Description": String(surfaceInfo?.description || "").trim(),
       "Surface Link": String(surfaceInfo?.link || "").trim(),
@@ -1708,6 +1760,12 @@
       "Black back": toSelectorBoolean(entry.blackBack),
       savDocumentId: entry.documentId || "",
       savFamilyDocumentId: entry.familyDocumentId || "",
+      savOptionName: String(entry.optionName || "").trim(),
+      savFamilyVariantColumns: Array.isArray(entry.familyVariantColumns) ? [...entry.familyVariantColumns] : [],
+      savFamilyVariantSelections: { ...variantSelections },
+      savFamilyVariantHelp: Array.isArray(entry.familyVariantHelp)
+        ? entry.familyVariantHelp.map((value) => ({ ...value }))
+        : [],
       availablePrintModes: entry.availablePrintModes || {},
       rolls,
       isCompleteProduct: true
@@ -1998,6 +2056,13 @@
 
   function applySelectorData(selectorData, source) {
     state.selectorRows = getPublishedSelectorRows(selectorData.rows);
+    state.familyRows = getPublishedSelectorRows(selectorData.familyRows || []);
+    if (!state.familyRows.some((row) => String(row.savFamilyDocumentId || "").trim() === state.selectedFamilyId)) {
+      state.selectedFamilyId = "";
+      state.familyDetailOpen = false;
+      state.familyVariantSelections = {};
+      state.familyPrintMode = "";
+    }
     state.selectorColumns = selectorData.selectorColumns;
     state.postProductSelectorColumns = selectorData.postProductSelectorColumns || [];
     state.productSource = source;
@@ -2008,6 +2073,7 @@
     renderClassSelector();
     renderLimitFilters();
     renderMountingSurfaceSelector();
+    renderSavFamilyCards();
   }
 
   function getPublishedSelectorRows(rows) {
@@ -2043,9 +2109,14 @@
       state.selectedStockQcode = "";
     }
     updateProgressiveVisibility(selectorState, parsed.elements, parsed.errors);
-    renderProductSearch();
-    renderSelectorSurvey(selectorState);
-    renderConfiguratorProgress(selectorState, parsed.elements);
+    renderSavFamilyCards();
+    if (state.familyDetailOpen) {
+      renderSavFamilyDetail(selectorState);
+    } else {
+      renderProductSearch();
+      renderSelectorSurvey(selectorState);
+      renderConfiguratorProgress(selectorState, parsed.elements);
+    }
     renderAdvancedConfigStatus();
 
     if (parsed.errors.length) {
@@ -2292,6 +2363,7 @@
   }
 
   function getSelectorState() {
+    if (state.familyDetailOpen) return getSavFamilySelectorState();
     const searchSelectionState = getActiveProductSearchSelectionState();
     if (searchSelectionState) return searchSelectionState;
 
@@ -2344,7 +2416,7 @@
         product: null,
         previewProduct,
         hasRows: state.selectorRows.length > 0,
-        completeProductCount: rows.length
+        completeProductCount: getProductSearchOptionCount(rows)
       };
     }
 
@@ -2358,7 +2430,7 @@
       question: null,
       product,
       hasRows: state.selectorRows.length > 0,
-      completeProductCount: rows.length
+      completeProductCount: getProductSearchOptionCount(rows)
     };
   }
 
@@ -2387,6 +2459,170 @@
         ${results.map((result, index) => renderProductSearchResult(result, index)).join("")}
       </div>
     `;
+  }
+
+  function renderSavFamilyCards() {
+    if (!ui.familyPanel || !ui.familyCards) return;
+    const results = getSavFamilyCardResults();
+    state.familyCardResults = results;
+    ui.familyPanel.hidden = state.familyDetailOpen || results.length === 0;
+    if (!results.length) {
+      ui.familyCards.innerHTML = "";
+      return;
+    }
+
+    const selectedFamilyId = getSelectedSavFamilyId();
+    ui.familyCards.innerHTML = results.map((result, index) => {
+      const row = result.row;
+      const familyId = String(row.savFamilyDocumentId || "").trim();
+      const selected = familyId && familyId === selectedFamilyId;
+      const image = result.rows.find((candidate) => candidate.generalImage?.url)?.generalImage;
+      const imageUrl = normalizePreviewUrl(image?.url);
+      const optionCount = getProductSearchOptionCount(result.rows);
+      const cardDescription = String(row.savFamilyCardDescription || "").trim();
+      return `
+        <button class="sav-family-card${selected ? " selected" : ""}" type="button" data-sav-family-index="${index}" aria-pressed="${selected ? "true" : "false"}">
+          <span class="sav-family-card-media${imageUrl ? "" : " fallback"}">
+            ${imageUrl
+              ? `<img src="${escapeHtml(imageUrl)}" alt="">`
+              : `<span aria-hidden="true">${escapeHtml(String(row.Product || "S").charAt(0).toUpperCase())}</span>`}
+          </span>
+          <span class="sav-family-card-content">
+            <strong>${escapeHtml(row.Product)}</strong>
+            ${row[BRAND_COLUMN] ? `<span class="sav-family-card-brand">${escapeHtml(row[BRAND_COLUMN])}</span>` : ""}
+            <span class="sav-family-card-summary">${escapeHtml(`${optionCount} ${optionCount === 1 ? "configuration" : "configurations"}`)}</span>
+            ${cardDescription ? `<span class="sav-family-card-description">${escapeHtml(cardDescription)}</span>` : ""}
+          </span>
+          <span class="sav-family-card-action">${selected ? "Selected" : "Choose"} <span aria-hidden="true">${selected ? "✓" : "→"}</span></span>
+        </button>
+      `;
+    }).join("");
+
+  }
+
+  function renderSavFamilyDetail(selectorState) {
+    if (!ui.familyDetail) return;
+    const result = getSelectedSavFamilyResult();
+    if (!state.familyDetailOpen || !result) {
+      ui.familyDetail.hidden = true;
+      ui.familyDetail.innerHTML = "";
+      return;
+    }
+
+    const rows = result.rows;
+    const variantColumns = getSavFamilyVariantColumns(rows);
+    const selectedRows = getSavFamilyRowsForSelections(rows);
+    const row = selectedRows[0] || result.row;
+    const printModes = getPrintModeOptionsForRows(selectedRows);
+    const product = selectorState.product || selectorState.previewProduct;
+    const galleryImages = getProductGalleryImages(rows);
+    const mainImage = row.generalImage?.url
+      ? row.generalImage
+      : galleryImages[0] || null;
+    const mainImageUrl = normalizePreviewUrl(mainImage?.url);
+    const description = String(row[GENERAL_DESCRIPTION_COLUMN] || "").trim();
+    const optionRows = getSavFamilyOptionRows(selectedRows);
+    const optionName = optionRows.length === 1
+      ? String(optionRows[0].savOptionName || "").trim()
+      : "";
+
+    const optionGroups = variantColumns.map((column, columnIndex) => {
+      const precedingSelections = {};
+      variantColumns.slice(0, columnIndex).forEach((earlierColumn) => {
+        if (state.familyVariantSelections[earlierColumn]) {
+          precedingSelections[earlierColumn] = state.familyVariantSelections[earlierColumn];
+        }
+      });
+      const availableRows = getSavFamilyRowsForSelections(rows, precedingSelections);
+      const values = getSavFamilyVariantChoices(rows, column);
+      const selectedValue = state.familyVariantSelections[column] || "";
+      const radios = values.map((value, valueIndex) => {
+        const available = getSavFamilyRowsForSelections(availableRows, { [column]: value }).length > 0;
+        const selected = normalizeKey(value) === normalizeKey(selectedValue);
+        const helpText = getSavFamilyVariantHelp(rows, column, value);
+        const helpId = `family-variant-help-${columnIndex}-${valueIndex}`;
+        return `
+          <span class="family-radio-choice">
+            <label class="family-radio-option${selected ? " selected" : ""}${available ? "" : " disabled"}">
+              <input type="radio" name="family-${escapeHtml(savSlugify(column, 60))}" value="${escapeHtml(value)}" data-family-variant="${escapeHtml(column)}"${selected ? " checked" : ""}${available ? "" : " disabled"}>
+              <span>${escapeHtml(getDisplaySelectorValue(column, value))}</span>
+            </label>
+            ${helpText ? `
+              <span class="family-variant-help">
+                <button type="button" data-family-variant-help aria-label="Help for ${escapeHtml(getDisplaySelectorValue(column, value))}" aria-describedby="${helpId}" aria-controls="${helpId}" aria-expanded="false">?</button>
+                <span class="family-variant-help-content" id="${helpId}" role="tooltip">${escapeHtml(helpText)}</span>
+              </span>
+            ` : ""}
+          </span>
+        `;
+      }).join("");
+      return `
+        <div class="family-option-group">
+          <div class="family-option-label"><strong>${escapeHtml(getDisplaySelectorColumn(column))}</strong><span>${escapeHtml(getDisplaySelectorValue(column, selectedValue))}</span></div>
+          <div class="family-radio-list" role="radiogroup" aria-label="${escapeHtml(getDisplaySelectorColumn(column))}">${radios || `<span class="family-variant-empty">No values assigned to linked options.</span>`}</div>
+        </div>
+      `;
+    }).join("");
+
+    const printModeField = printModes.length
+      ? `<select data-family-print-mode aria-label="Print mode">${printModes.map((mode) => `<option value="${escapeHtml(mode.label)}"${normalizeKey(mode.label) === normalizeKey(state.familyPrintMode) ? " selected" : ""}>${escapeHtml(mode.label)}</option>`).join("")}</select>`
+      : `<select disabled aria-label="Print mode"><option>No print modes configured</option></select>`;
+    const optionCount = optionRows.length;
+    const selectionStatus = optionCount === 1
+      ? "Configuration selected"
+      : `${optionCount} configurations match`;
+
+    ui.familyDetail.hidden = false;
+    ui.familyDetail.innerHTML = `
+      <nav class="family-breadcrumbs" aria-label="Breadcrumb">
+        <button type="button" data-family-back>SAV products</button><span>/</span><strong>${escapeHtml(row.Product)}</strong>
+      </nav>
+      <div class="family-detail-heading">
+        <div><span class="family-detail-brand">${escapeHtml(row[BRAND_COLUMN] || "Brand not specified")}</span><h2>${escapeHtml(row.Product)}</h2></div>
+      </div>
+      <div class="family-detail-grid">
+        <div class="family-detail-product">
+          <${galleryImages.length ? "button" : "div"} class="family-detail-image${mainImageUrl ? " has-image" : ""}"${galleryImages.length ? ` type="button" data-family-gallery-open aria-label="Open product gallery"` : ""}>
+            ${mainImageUrl ? `<img src="${escapeHtml(mainImageUrl)}" alt="">` : `<span>${escapeHtml(String(row.Product || "S").charAt(0).toUpperCase())}</span>`}
+            <small>${galleryImages.length ? `Image 1 of ${galleryImages.length}` : (mainImageUrl ? "Product image" : "Image not supplied")}</small>
+          </${galleryImages.length ? "button" : "div"}>
+          <div class="family-detail-about">
+            <h3>About this product</h3>
+            ${optionName ? `<p class="family-detail-option-name"><strong>Option:</strong> ${escapeHtml(optionName)}</p>` : ""}
+            <p>${escapeHtml(description || "No product description has been supplied.")}</p>
+          </div>
+          ${product ? renderProductSpecSheetLinks(product) : ""}
+        </div>
+        <aside class="family-config-panel">
+          <div class="family-config-title"><div><h3>Configure your SAV</h3><p>Options are supplied by Strapi.</p></div><span>01 · OPTIONS</span></div>
+          ${optionGroups || `<div class="family-option-group"><p>No variant choices have been configured for this family in Strapi.</p></div>`}
+          <div class="family-option-group">
+            <div class="family-option-label"><strong>Print mode</strong><span>Available modes</span></div>
+            <div class="family-print-mode">${printModeField}</div>
+          </div>
+          <div class="family-selection-result"><span>${escapeHtml(selectionStatus)}</span><strong>${escapeHtml(product?.name || row.Product)}</strong></div>
+        </aside>
+      </div>
+    `;
+  }
+
+  function getSavFamilyCardResults() {
+    const grouped = new Map();
+    state.familyRows.forEach((row, index) => {
+      const familyId = String(row.savFamilyDocumentId || "").trim();
+      if (!familyId || !row.isCompleteProduct || !row.Product) return;
+      if (!grouped.has(familyId)) {
+        grouped.set(familyId, { row, rows: [], indexes: [] });
+      }
+      const result = grouped.get(familyId);
+      result.rows.push(row);
+      result.indexes.push(index);
+    });
+    return Array.from(grouped.values());
+  }
+
+  function getSelectedSavFamilyId() {
+    return state.selectedFamilyId;
   }
 
   function handleProductSearchInput() {
@@ -2581,6 +2817,177 @@
   function applyProductSearchSelection(resultIndex) {
     const result = state.productSearchResults[resultIndex];
     if (!result) return;
+    applyProductResultSelection(result);
+  }
+
+  function applySavFamilySelection(resultIndex) {
+    const result = state.familyCardResults[resultIndex];
+    if (!result) return;
+    const familyId = String(result.row?.savFamilyDocumentId || "").trim();
+    if (!familyId) return;
+    state.selectedFamilyId = familyId;
+    state.familyDetailOpen = true;
+    state.familyVariantSelections = {};
+    state.familyPrintMode = "";
+    initializeSavFamilySelections(result.rows);
+    recalculate();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeSavFamilyDetail() {
+    state.familyDetailOpen = false;
+    state.selectedFamilyId = "";
+    state.familyVariantSelections = {};
+    state.familyPrintMode = "";
+    state.selectedStockQcode = "";
+    recalculate();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function getSelectedSavFamilyResult() {
+    return state.familyCardResults.find((result) =>
+      String(result.row?.savFamilyDocumentId || "").trim() === state.selectedFamilyId
+    ) || null;
+  }
+
+  function getSavFamilyVariantColumns(rows) {
+    const columns = [];
+    rows.forEach((row) => {
+      const configuredColumns = Array.isArray(row.savFamilyVariantColumns)
+        ? row.savFamilyVariantColumns
+        : [];
+      configuredColumns.forEach((column) => {
+        const normalizedColumn = String(column || "").trim();
+        if (normalizedColumn && !columns.includes(normalizedColumn)) columns.push(normalizedColumn);
+      });
+    });
+    return columns;
+  }
+
+  function getSavFamilyVariantValue(row, column) {
+    return String(row?.savFamilyVariantSelections?.[column] || "").trim();
+  }
+
+  function getSavFamilyVariantChoices(rows, column) {
+    return Array.from(new Set(rows
+      .map((row) => getSavFamilyVariantValue(row, column))
+      .filter(isMeaningfulSelectorValue)))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+  }
+
+  function getSavFamilyVariantHelp(rows, column, value) {
+    for (const row of rows) {
+      const help = (Array.isArray(row.savFamilyVariantHelp) ? row.savFamilyVariantHelp : []).find((candidate) =>
+        normalizeKey(candidate.column) === normalizeKey(column) &&
+        normalizeKey(candidate.label) === normalizeKey(value)
+      );
+      if (help?.helpText) return String(help.helpText).trim();
+    }
+    return "";
+  }
+
+  function closeSavFamilyVariantHelp() {
+    if (!ui.familyDetail) return;
+    ui.familyDetail.querySelectorAll(".family-variant-help.open").forEach((help) => {
+      help.classList.remove("open");
+      help.querySelector("[data-family-variant-help]")?.setAttribute("aria-expanded", "false");
+    });
+  }
+
+  function initializeSavFamilySelections(rows) {
+    const columns = getSavFamilyVariantColumns(rows);
+    const firstRow = rows.find((row) =>
+      row.isCompleteProduct && columns.every((column) => getSavFamilyVariantValue(row, column))
+    ) || rows.find((row) => columns.every((column) => getSavFamilyVariantValue(row, column))) || rows[0];
+    if (!firstRow) return;
+    columns.forEach((column) => {
+      const value = getSavFamilyVariantValue(firstRow, column) || getSavFamilyVariantChoices(rows, column)[0] || "";
+      if (value) state.familyVariantSelections[column] = value;
+    });
+    syncSavFamilyPrintMode(rows);
+  }
+
+  function getSavFamilyRowsForSelections(rows, selections = state.familyVariantSelections) {
+    return rows.filter((row) => Object.entries(selections).every(([column, value]) =>
+      !value || normalizeKey(getSavFamilyVariantValue(row, column)) === normalizeKey(value)
+    ));
+  }
+
+  function getSavFamilyOptionRows(rows) {
+    const optionIds = new Set();
+    return rows.filter((row) => {
+      const optionId = String(row.savDocumentId || "").trim();
+      if (!optionId) return true;
+      if (optionIds.has(optionId)) return false;
+      optionIds.add(optionId);
+      return true;
+    });
+  }
+
+  function applySavFamilyVariant(column, value) {
+    const result = getSelectedSavFamilyResult();
+    if (!result || !column || !value) return;
+    const columns = getSavFamilyVariantColumns(result.rows);
+    const changedIndex = columns.indexOf(column);
+    if (changedIndex < 0) return;
+    const selections = {};
+    columns.slice(0, changedIndex).forEach((earlierColumn) => {
+      if (state.familyVariantSelections[earlierColumn]) {
+        selections[earlierColumn] = state.familyVariantSelections[earlierColumn];
+      }
+    });
+    selections[column] = value;
+    let candidates = getSavFamilyRowsForSelections(result.rows, selections);
+    if (!candidates.length) return;
+    columns.slice(changedIndex + 1).forEach((laterColumn) => {
+      const current = state.familyVariantSelections[laterColumn];
+      const values = getSavFamilyVariantChoices(candidates, laterColumn);
+      const selected = values.find((candidate) => normalizeKey(candidate) === normalizeKey(current)) || values[0] || "";
+      if (!selected) return;
+      selections[laterColumn] = selected;
+      candidates = getSavFamilyRowsForSelections(candidates, { [laterColumn]: selected });
+    });
+    state.familyVariantSelections = selections;
+    syncSavFamilyPrintMode(candidates);
+    state.selectedStockQcode = "";
+    recalculate();
+  }
+
+  function syncSavFamilyPrintMode(rows) {
+    const modes = getPrintModeOptionsForRows(rows);
+    const selected = modes.find((mode) => normalizeKey(mode.label) === normalizeKey(state.familyPrintMode));
+    state.familyPrintMode = selected?.label || modes[0]?.label || "";
+  }
+
+  function getSavFamilySelectorState() {
+    const result = getSelectedSavFamilyResult();
+    if (!result) {
+      return { selections: {}, pathEntries: [], candidates: [], question: null, product: null, previewProduct: null, hasRows: false, completeProductCount: 0 };
+    }
+    const rows = getSavFamilyRowsForSelections(result.rows);
+    syncSavFamilyPrintMode(rows);
+    const optionRows = getSavFamilyOptionRows(rows);
+    const selections = {
+      Product: result.row.Product,
+      ...state.familyVariantSelections,
+      [PRINT_MODE_COLUMN]: state.familyPrintMode
+    };
+    const product = optionRows.length === 1 && state.familyPrintMode
+      ? buildProductFromRows(rows, result.row.Product, selections)
+      : null;
+    return {
+      selections,
+      pathEntries: [],
+      candidates: rows,
+      question: null,
+      product,
+      previewProduct: product || buildProductFromRows(rows, result.row.Product, selections),
+      hasRows: result.rows.length > 0,
+      completeProductCount: optionRows.length
+    };
+  }
+
+  function applyProductResultSelection(result) {
     const rows = result.rows && result.rows.length ? result.rows : [result.row];
 
     const selections = {};
@@ -2726,6 +3133,7 @@
 
   function renderConfiguratorGuidance(selectorState, elements = [], best = null) {
     if (!ui.configuratorGuidance) return;
+    if (state.familyDetailOpen) return;
     const hasProduct = Boolean(selectorState.product);
     const hasElements = elements.length > 0;
     const product = selectorState.product || selectorState.previewProduct;
@@ -2860,11 +3268,15 @@
     const hasValidElements = errors.length === 0 && elements.length > 0;
     const showJobResults = hasSelectedProduct && hasValidElements;
 
+    if (ui.familyPanel) ui.familyPanel.hidden = state.familyDetailOpen || state.familyCardResults.length === 0;
+    if (ui.familyDetail) ui.familyDetail.hidden = !state.familyDetailOpen;
+    if (ui.setupPanel) ui.setupPanel.hidden = state.familyDetailOpen;
     if (ui.filtersPanel) ui.filtersPanel.hidden = !showAdditionalFilters;
     if (ui.advancedOptionsConfig) ui.advancedOptionsConfig.hidden = !hasSelectedProduct;
     if (ui.artworkConfig) ui.artworkConfig.hidden = !showJobResults;
     if (ui.outputWorkflow) ui.outputWorkflow.hidden = !showJobResults;
     if (ui.appShell) ui.appShell.classList.toggle("is-input-only", !showJobResults);
+    if (ui.appShell) ui.appShell.classList.toggle("is-family-detail", state.familyDetailOpen);
   }
 
   function shouldShowAdditionalFilters() {

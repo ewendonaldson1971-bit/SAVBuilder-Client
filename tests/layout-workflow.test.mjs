@@ -74,6 +74,32 @@ test("places the first-step class controls beside their instruction", () => {
   assert.match(css, /\.class-step\.is-active\s*\{[\s\S]*?border-color: #348ede;[\s\S]*?box-shadow:/);
 });
 
+test("shows SAV family cards independently before the Advanced Selector", () => {
+  const familySelectionStart = app.indexOf("function applySavFamilySelection(resultIndex)");
+  const familySelectionEnd = app.indexOf("function applyProductResultSelection(result)", familySelectionStart);
+  const familySelectionBody = app.slice(familySelectionStart, familySelectionEnd);
+  assert.match(html, /id="sav-family-panel"[\s\S]*?Choose a product family[\s\S]*?id="sav-family-cards"/);
+  assert.ok(html.indexOf('id="sav-family-panel"') < html.indexOf('<h2 id="setup-title">Advanced Selector</h2>'));
+  assert.match(html, /Browse SAV product families independently from the Advanced Selector\.[\s\S]*?Advanced Selector/);
+  assert.doesNotMatch(html, /id="product-finder"|Legacy catalogue|Browse products not yet in a family/);
+  assert.match(app, /function getSavFamilyCardResults\(\)/);
+  assert.match(familySelectionBody, /state\.selectedFamilyId = familyId;[\s\S]*?state\.familyDetailOpen = true;[\s\S]*?initializeSavFamilySelections\(result\.rows\);[\s\S]*?recalculate\(\);/);
+  assert.doesNotMatch(familySelectionBody, /applyProductResultSelection|selectorSelections|productSearchSelection/);
+  assert.doesNotMatch(app, /ui\.productFinder|getLegacySelectorRows/);
+  assert.match(css, /\.sav-family-cards\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+});
+
+test("opens a Sheet Builder-style family detail screen with radio variants", () => {
+  assert.match(html, /id="sav-family-detail" class="sav-family-detail"[\s\S]*?id="setup-title">Advanced Selector/);
+  assert.match(app, /function renderSavFamilyDetail\(selectorState\)/);
+  assert.match(app, /data-family-back[\s\S]*?Configure your SAV[\s\S]*?01 · OPTIONS/);
+  assert.match(app, /class="family-radio-list" role="radiogroup"/);
+  assert.match(app, /type="radio"[\s\S]*?data-family-variant/);
+  assert.match(app, /if \(state\.familyDetailOpen\) return getSavFamilySelectorState\(\);/);
+  assert.match(app, /if \(ui\.setupPanel\) ui\.setupPanel\.hidden = state\.familyDetailOpen;/);
+  assert.match(css, /\.family-detail-grid\s*\{[\s\S]*?grid-template-columns: minmax\(300px, 0\.92fr\) minmax\(420px, 1\.08fr\);/);
+});
+
 test("provides a discreet Strapi shortcut at the right of the header", () => {
   const imposition = html.indexOf('class="imposition-actions"');
   const strapi = html.indexOf('class="strapi-admin-link"');
