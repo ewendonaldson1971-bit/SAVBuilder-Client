@@ -1438,10 +1438,28 @@
   }
 
   async function loadSavCatalogFromStrapi() {
-    const url = new URL("/api/sav-builder-options", STRAPI_BASE_URL);
+    const [options, families] = await Promise.all([
+      loadPaginatedStrapiCollection("/api/sav-builder-options", (url) => {
+        url.searchParams.set("sort", "sortOrder:asc");
+        url.searchParams.set("populate", "*");
+      }, "SAV option catalogue"),
+      loadPaginatedStrapiCollection("/api/sav-product-families", (url) => {
+        url.searchParams.set("sort", "sortOrder:asc");
+        url.searchParams.set("populate[generalImage]", "true");
+        url.searchParams.set("populate[galleryImages]", "true");
+        url.searchParams.set("populate[productSpecSheet]", "true");
+        url.searchParams.set("populate[surfaceGuidance][populate]", "*");
+        url.searchParams.set("populate[variantTypes][populate]", "*");
+        url.searchParams.set("populate[options][populate]", "*");
+      }, "SAV family catalogue").catch(() => [])
+    ]);
+    return { options, families };
+  }
+
+  async function loadPaginatedStrapiCollection(path, configureUrl, label) {
+    const url = new URL(path, STRAPI_BASE_URL);
     url.searchParams.set("pagination[pageSize]", String(Math.min(100, STRAPI_PAGE_SIZE)));
-    url.searchParams.set("sort", "sortOrder:asc");
-    url.searchParams.set("populate", "*");
+    configureUrl?.(url);
 
     const controller = typeof AbortController === "function" ? new AbortController() : null;
     const timeout = window.setTimeout(() => controller?.abort(), STRAPI_REQUEST_TIMEOUT_MS);
@@ -1458,24 +1476,26 @@
           cache: "no-store",
           signal: controller?.signal
         });
-        if (!response.ok) throw new Error(`Strapi catalogue returned HTTP ${response.status}.`);
+        if (!response.ok) throw new Error(`${label} returned HTTP ${response.status}.`);
 
         const payload = await response.json();
-        if (!Array.isArray(payload?.data)) throw new Error("Strapi catalogue response has no data array.");
+        if (!Array.isArray(payload?.data)) throw new Error(`${label} response has no data array.`);
         entries.push(...payload.data);
         pageCount = Math.max(1, Number(payload?.meta?.pagination?.pageCount) || 1);
         page += 1;
       } while (page <= pageCount);
       return entries.map((entry) => entry?.attributes ? { ...entry.attributes, documentId: entry.documentId || entry.id } : entry);
     } catch (error) {
-      if (error?.name === "AbortError") throw new Error("Strapi catalogue request timed out.");
+      if (error?.name === "AbortError") throw new Error(`${label} request timed out.`);
       throw error;
     } finally {
       window.clearTimeout(timeout);
     }
   }
 
-  function buildSelectorDataFromStrapi(catalogEntries) {
+  function buildSelectorDataFromStrapi(catalog) {
+    const normalized = normalizeSavCatalog(catalog);
+    const catalogEntries = normalized.entries;
     const rows = catalogEntries.flatMap((entry) => {
       const rollOptions = (Array.isArray(entry?.rollOptions) ? entry.rollOptions : [])
         .map((roll) => ({
@@ -1496,8 +1516,118 @@
     return {
       rows,
       selectorColumns: [],
-      postProductSelectorColumns: [LAMINATE_COLUMN]
+      postProductSelectorColumns: normalized.postProductSelectorColumns
     };
+  }
+
+  function normalizeSavCatalog(catalog) {
+    if (Array.isArray(catalog)) {
+      return { entries: catalog, postProductSelectorColumns: [LAMINATE_COLUMN] };
+    }
+
+    const options = Array.isArray(catalog?.options) ? catalog.options : [];
+    const families = Array.isArray(catalog?.families) ? catalog.families : [];
+    const linkedOptionIds = new Set();
+    const familyEntries = [];
+    const variantColumns = [];
+
+    families.forEach((familyRecord) => {
+      const family = unwrapStrapiEntity(familyRecord);
+      const definitions = getSavFamilyVariantDefinitions(family);
+      definitions.forEach((definition) => {
+        if (!variantColumns.some((column) => normalizeKey(column) === normalizeKey(definition.name))) {
+          variantColumns.push(definition.name);
+        }
+      });
+
+      getStrapiRelationItems(family.options).forEach((option) => {
+        const optionId = String(option.documentId || option.id || "").trim();
+        if (optionId) linkedOptionIds.add(optionId);
+        const variantSelections = resolveSavFamilyVariantSelections(definitions, option);
+        familyEntries.push({
+          ...option,
+          ...family,
+          documentId: option.documentId || option.id || "",
+          familyDocumentId: family.documentId || family.id || "",
+          sourceKey: option.sourceKey || family.sourceKey || "",
+          sortOrder: Number(option.sortOrder ?? family.sortOrder) || 0,
+          laminateName: variantSelections[LAMINATE_COLUMN] || option.laminateName || "",
+          laminateSpecSheet: option.laminateSpecSheet,
+          laminateSpecSheetUrl: option.laminateSpecSheetUrl,
+          availablePrintModes: option.availablePrintModes || {},
+          rollOptions: option.rollOptions || [],
+          variantSelections
+        });
+      });
+    });
+
+    const legacyEntries = options
+      .map(unwrapStrapiEntity)
+      .filter((option) => {
+        const optionId = String(option.documentId || option.id || "").trim();
+        return !optionId || !linkedOptionIds.has(optionId);
+      });
+    const hasLaminate = [...familyEntries, ...legacyEntries].some((entry) =>
+      String(entry.laminateName || entry.variantSelections?.[LAMINATE_COLUMN] || "").trim()
+    );
+    const postProductSelectorColumns = [...variantColumns];
+    if (hasLaminate && !postProductSelectorColumns.some(isLaminateColumnName)) {
+      postProductSelectorColumns.unshift(LAMINATE_COLUMN);
+    }
+
+    return {
+      entries: [...familyEntries, ...legacyEntries],
+      postProductSelectorColumns: postProductSelectorColumns.length
+        ? postProductSelectorColumns
+        : [LAMINATE_COLUMN]
+    };
+  }
+
+  function unwrapStrapiEntity(value) {
+    if (!value || typeof value !== "object") return {};
+    const entity = value.attributes ? { ...value.attributes } : { ...value };
+    entity.documentId = value.documentId || entity.documentId || value.id || entity.id || "";
+    return entity;
+  }
+
+  function getStrapiRelationItems(value) {
+    const source = Array.isArray(value?.data)
+      ? value.data
+      : Array.isArray(value)
+        ? value
+        : [];
+    return source.map(unwrapStrapiEntity);
+  }
+
+  function getSavFamilyVariantDefinitions(family) {
+    return getStrapiRelationItems(family?.variantTypes)
+      .map((definition) => ({
+        name: String(definition.name || "").trim(),
+        sortOrder: Number(definition.sortOrder) || 0,
+        values: getStrapiRelationItems(definition.values)
+      }))
+      .filter((definition) => definition.name)
+      .sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name));
+  }
+
+  function resolveSavFamilyVariantSelections(definitions, option) {
+    const selections = {};
+    const selectedValues = getStrapiRelationItems(option?.variantValues);
+    definitions.forEach((definition) => {
+      const selected = selectedValues.find((candidate) =>
+        normalizeKey(candidate.variantName) === normalizeKey(definition.name)
+      );
+      if (!selected) return;
+      const matchValue = String(selected.variantValue || "").trim();
+      const configuredValue = definition.values.find((candidate) =>
+        String(candidate.matchValue || "").trim() === matchValue
+      );
+      selections[definition.name] = String(configuredValue?.label || matchValue).trim();
+    });
+    if (!selections[LAMINATE_COLUMN] && option?.laminateName) {
+      selections[LAMINATE_COLUMN] = String(option.laminateName).trim();
+    }
+    return selections;
   }
 
   function buildSelectorRowFromStrapi(entry, surfaceInfo, rolls) {
@@ -1512,12 +1642,17 @@
     );
     const surface = SURFACE_LABELS[surfaceInfo?.surface] || String(surfaceInfo?.surface || "").trim();
 
+    const variantSelections = entry.variantSelections && typeof entry.variantSelections === "object"
+      ? entry.variantSelections
+      : {};
+
     return {
       Product: String(entry.productName || "").trim(),
       Brand: String(entry.brand || "").trim(),
       Class: String(entry.materialClass || "").trim(),
       Longevity: String(entry.longevity || "").trim(),
-      Laminate: String(entry.laminateName || "").trim(),
+      ...variantSelections,
+      Laminate: String(variantSelections[LAMINATE_COLUMN] || entry.laminateName || "").trim(),
       [MOUNTING_SURFACE_COLUMN]: surface,
       [LEGACY_SURFACE_COLUMN]: surface,
       "Product Spec Sheet": productSpecSheet,
