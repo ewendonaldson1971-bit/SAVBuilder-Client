@@ -100,6 +100,7 @@
     "Published?"
   ];
   const DERIVED_PERFORATION_COLUMN = "Perforation";
+  const SAV_FAMILY_VARIANT_COLUMN_PREFIX = "SAV Family Variant: ";
   const CART_WINDOW_NAME = "savBuilderCart";
   const CART_PAGE_URL = "https://vivad.com.au/shopping-cart";
   const IMPOSITION_EMAIL_TO = "sales@vivad.com.au";
@@ -1535,8 +1536,8 @@
       const family = unwrapStrapiEntity(familyRecord);
       const definitions = getSavFamilyVariantDefinitions(family);
       definitions.forEach((definition) => {
-        if (!variantColumns.some((column) => normalizeKey(column) === normalizeKey(definition.name))) {
-          variantColumns.push(definition.name);
+        if (!variantColumns.some((column) => normalizeKey(column) === normalizeKey(definition.column))) {
+          variantColumns.push(definition.column);
         }
       });
 
@@ -1544,14 +1545,28 @@
         const optionId = String(option.documentId || option.id || "").trim();
         if (optionId) linkedOptionIds.add(optionId);
         const variantSelections = resolveSavFamilyVariantSelections(definitions, option);
+        const optionSurfaceGuidance = getStrapiRelationItems(option.surfaceGuidance);
+        const familySurfaceGuidance = getStrapiRelationItems(family.surfaceGuidance);
         familyEntries.push({
-          ...option,
           ...family,
+          ...option,
           documentId: option.documentId || option.id || "",
           familyDocumentId: family.documentId || family.id || "",
+          productName: family.productName || option.productName || "",
+          brand: family.brand || option.brand || "",
           sourceKey: option.sourceKey || family.sourceKey || "",
-          sortOrder: Number(option.sortOrder ?? family.sortOrder) || 0,
+          sortOrder: Number(family.sortOrder ?? option.sortOrder) || 0,
+          optionSortOrder: Number(option.sortOrder) || 0,
           laminateName: variantSelections[LAMINATE_COLUMN] || option.laminateName || "",
+          productSpecSheet: getPreferredStrapiMediaRelation(option.productSpecSheet, family.productSpecSheet),
+          productSpecSheetUrl: option.productSpecSheetUrl || family.productSpecSheetUrl || "",
+          galleryImages: getPreferredStrapiMediaRelation(option.galleryImages, family.galleryImages),
+          generalDescription: option.generalDescription || family.generalDescription || "",
+          generalImage: getPreferredStrapiMediaRelation(option.generalImage, family.generalImage),
+          generalLink: option.generalLink || family.generalLink || "",
+          generalLink2: option.generalLink2 || family.generalLink2 || "",
+          generalLink3: option.generalLink3 || family.generalLink3 || "",
+          surfaceGuidance: optionSurfaceGuidance.length ? optionSurfaceGuidance : familySurfaceGuidance,
           laminateSpecSheet: option.laminateSpecSheet,
           laminateSpecSheetUrl: option.laminateSpecSheetUrl,
           availablePrintModes: option.availablePrintModes || {},
@@ -1599,10 +1614,15 @@
     return source.map(unwrapStrapiEntity);
   }
 
+  function getPreferredStrapiMediaRelation(optionValue, familyValue) {
+    return getStrapiMediaItems(optionValue).length ? optionValue : familyValue;
+  }
+
   function getSavFamilyVariantDefinitions(family) {
     return getStrapiRelationItems(family?.variantTypes)
       .map((definition) => ({
         name: String(definition.name || "").trim(),
+        column: getSavFamilyVariantColumnName(definition.name),
         sortOrder: Number(definition.sortOrder) || 0,
         values: getStrapiRelationItems(definition.values)
       }))
@@ -1622,12 +1642,22 @@
       const configuredValue = definition.values.find((candidate) =>
         String(candidate.matchValue || "").trim() === matchValue
       );
-      selections[definition.name] = String(configuredValue?.label || matchValue).trim();
+      selections[definition.column] = String(configuredValue?.label || matchValue).trim();
     });
     if (!selections[LAMINATE_COLUMN] && option?.laminateName) {
       selections[LAMINATE_COLUMN] = String(option.laminateName).trim();
     }
     return selections;
+  }
+
+  function getSavFamilyVariantColumnName(name) {
+    const label = String(name || "").trim();
+    if (!label || isLaminateColumnName(label)) return LAMINATE_COLUMN;
+    return `${SAV_FAMILY_VARIANT_COLUMN_PREFIX}${label}`;
+  }
+
+  function isSavFamilyVariantColumnName(column) {
+    return String(column || "").startsWith(SAV_FAMILY_VARIANT_COLUMN_PREFIX);
   }
 
   function buildSelectorRowFromStrapi(entry, surfaceInfo, rolls) {
@@ -1647,11 +1677,11 @@
       : {};
 
     return {
+      ...variantSelections,
       Product: String(entry.productName || "").trim(),
       Brand: String(entry.brand || "").trim(),
       Class: String(entry.materialClass || "").trim(),
       Longevity: String(entry.longevity || "").trim(),
-      ...variantSelections,
       Laminate: String(variantSelections[LAMINATE_COLUMN] || entry.laminateName || "").trim(),
       [MOUNTING_SURFACE_COLUMN]: surface,
       [LEGACY_SURFACE_COLUMN]: surface,
@@ -1677,6 +1707,7 @@
       Specialty: toSelectorBoolean(entry.specialty),
       "Black back": toSelectorBoolean(entry.blackBack),
       savDocumentId: entry.documentId || "",
+      savFamilyDocumentId: entry.familyDocumentId || "",
       availablePrintModes: entry.availablePrintModes || {},
       rolls,
       isCompleteProduct: true
@@ -2398,6 +2429,8 @@
   }
 
   function getProductSearchGroupKey(row) {
+    const familyId = String(row.savFamilyDocumentId || "").trim();
+    if (familyId) return `family:${familyId}`;
     return [
       row.Product,
       row[BRAND_COLUMN],
@@ -2412,12 +2445,16 @@
 
   function getProductSearchHaystack(row) {
     const mountingSurface = row[MOUNTING_SURFACE_COLUMN];
+    const familyVariantValues = Object.entries(row)
+      .filter(([column]) => isSavFamilyVariantColumnName(column))
+      .map(([, value]) => value);
     const values = [
       row.Product,
       row[BRAND_COLUMN],
       mountingSurface,
       getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, mountingSurface),
       row.Laminate,
+      ...familyVariantValues,
       ...getRollQCodes(row)
     ].filter(Boolean);
 
@@ -2490,16 +2527,23 @@
 
   function getProductSearchMeta(result) {
     const row = result.row || result;
+    const rows = result.rows || [row];
     const surfaces = getProductSearchSurfaces(result);
     const surfaceLabels = surfaces.map((surface) => getDisplaySelectorValue(MOUNTING_SURFACE_COLUMN, surface));
+    const isFamily = rows.some((candidate) => candidate.savFamilyDocumentId);
+    const classes = getDistinctValues(rows, "Class").filter(Boolean);
+    const familyOptionCount = isFamily ? getProductSearchOptionCount(rows) : 0;
     const parts = [
       row[BRAND_COLUMN] ? `Brand: ${row[BRAND_COLUMN]}` : "",
+      isFamily ? `${familyOptionCount} ${familyOptionCount === 1 ? "option" : "options"}` : "",
+      isFamily && classes.length ? `${classes.length === 1 ? "Class" : "Classes"}: ${classes.join(", ")}` : "",
       row.Laminate ? `Laminate: ${row.Laminate}` : "",
       surfaceLabels.length ? `${surfaceLabels.length === 1 ? "Mounting surface" : "Mounting surfaces"}: ${surfaceLabels.join(", ")}` : "",
-      row.Type,
-      row[DERIVED_PERFORATION_COLUMN],
-      row[LONGEVITY_COLUMN]
+      isFamily ? "" : row.Type,
+      isFamily ? "" : row[DERIVED_PERFORATION_COLUMN],
+      isFamily ? "" : row[LONGEVITY_COLUMN]
     ].filter(Boolean);
+    if (isFamily) return parts.join(" | ");
     const widths = row.rolls && row.rolls.length
       ? getRollWidthLabels(row).join(", ")
       : "";
@@ -2507,6 +2551,11 @@
     const qcodes = getRollQCodes(row);
     if (qcodes.length) parts.push(`${qcodes.length === 1 ? "QCode" : "QCodes"}: ${qcodes.join(", ")}`);
     return parts.join(" | ");
+  }
+
+  function getProductSearchOptionCount(rows) {
+    const optionIds = new Set(rows.map((row) => String(row.savDocumentId || "").trim()).filter(Boolean));
+    return optionIds.size || 1;
   }
 
   function getProductSearchSurfaces(result) {
@@ -2976,6 +3025,9 @@
   }
 
   function getDisplaySelectorColumn(column) {
+    if (isSavFamilyVariantColumnName(column)) {
+      return String(column).slice(SAV_FAMILY_VARIANT_COLUMN_PREFIX.length);
+    }
     return String(column || "");
   }
 
@@ -3016,10 +3068,26 @@
       }
     }
 
+    for (const column of state.postProductSelectorColumns.filter(isSavFamilyVariantColumnName)) {
+      if (!shouldShowSelectorColumn(column)) continue;
+      if (selections[column]) {
+        entries.push({ column, value: selections[column], inferred: false });
+        continue;
+      }
+
+      if (question && question.column === column) break;
+      const choices = getDistinctValues(candidates, column);
+      if (choices.length === 1 && isMeaningfulSelectorValue(choices[0])) {
+        entries.push({ column, value: choices[0], inferred: true });
+      }
+    }
+
     const printModeEntry = getPrintModePathEntry(candidates, selections, question);
     if (printModeEntry) entries.push(printModeEntry);
 
-    for (const column of state.postProductSelectorColumns) {
+    for (const column of state.postProductSelectorColumns.filter((candidate) =>
+      !isSavFamilyVariantColumnName(candidate)
+    )) {
       if (!shouldShowSelectorColumn(column)) continue;
       if (selections[column]) {
         entries.push({ column, value: selections[column], inferred: false });
@@ -3053,10 +3121,20 @@
       }
     }
 
+    for (const column of state.postProductSelectorColumns.filter(isSavFamilyVariantColumnName)) {
+      if (selections[column]) continue;
+      const choices = getSortedSelectorChoices(candidates, column);
+      if (choices.length > 1) {
+        return { column, label: column, choices };
+      }
+    }
+
     const printModeQuestion = getPrintModeQuestion(candidates, selections);
     if (printModeQuestion) return printModeQuestion;
 
-    for (const column of state.postProductSelectorColumns) {
+    for (const column of state.postProductSelectorColumns.filter((candidate) =>
+      !isSavFamilyVariantColumnName(candidate)
+    )) {
       if (!shouldShowSelectorColumn(column)) continue;
       if (selections[column]) continue;
       const choices = getSortedSelectorChoices(candidates, column);
@@ -3290,7 +3368,11 @@
   }
 
   function getSelectorSelectionOrder() {
-    return [...state.selectorColumns, "Product", PRINT_MODE_COLUMN, ...state.postProductSelectorColumns];
+    const familyVariants = state.postProductSelectorColumns.filter(isSavFamilyVariantColumnName);
+    const remainingPostProductColumns = state.postProductSelectorColumns.filter((column) =>
+      !isSavFamilyVariantColumnName(column)
+    );
+    return [...state.selectorColumns, "Product", ...familyVariants, PRINT_MODE_COLUMN, ...remainingPostProductColumns];
   }
 
   function getPrintableRollWidth(roll) {
@@ -4656,15 +4738,16 @@
   function getProductWorkflowRows(selectorState, productName) {
     const product = String(productName || "").trim();
     if (!product) return [];
-    if (state.productSearchSelection) {
-      return state.productSearchSelection.rows.filter((row) =>
-        state.selectorRows.includes(row) && row.isCompleteProduct && row.Product === product && matchesProductSearchFilters(row)
-      );
-    }
     const selections = {
-      ...getSelectionsBeforeColumn(selectorState.selections || {}, "Product"),
+      ...(selectorState.selections || {}),
       Product: product
     };
+    if (state.productSearchSelection) {
+      const searchRows = state.productSearchSelection.rows.filter((row) =>
+        state.selectorRows.includes(row) && row.isCompleteProduct && row.Product === product && matchesProductSearchFilters(row)
+      );
+      return filterSelectorRowsBySelections(searchRows, selections);
+    }
     return getCandidateSelectorRows(selections).filter((row) => row.isCompleteProduct);
   }
 
