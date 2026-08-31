@@ -41,7 +41,12 @@ test("groups family cards without changing the Product Selector catalogue", () =
   assert.match(app, /function getCandidateSelectorRows\(selections\)[\s\S]*?state\.selectorRows\.filter\(matchesSelectedFilters\)/);
   assert.doesNotMatch(app, /getLegacySelectorRows/);
   assert.match(app, /function getProductSearchOptionCount\(rows\)/);
-  assert.match(app, /optionCount === 1 \? "configuration" : "configurations"/);
+  const cardRenderer = app.slice(
+    app.indexOf("function renderSavFamilyCards"),
+    app.indexOf("function renderSavFamilyDetail")
+  );
+  assert.doesNotMatch(cardRenderer, /optionCount|configurations?/);
+  assert.doesNotMatch(cardRenderer, /sav-family-card-brand|row\[BRAND_COLUMN\]/);
 });
 
 test("keeps family card and configuration descriptions separate", () => {
@@ -80,6 +85,20 @@ test("uses only explicitly configured family variant types and values", () => {
   );
   assert.doesNotMatch(columnResolver, /CLASS_COLUMN|Object\.keys\(row\)|isLaminateColumnName/);
   assert.match(app, /function applySavFamilyVariant\(column, value\)[\s\S]*?columns\.slice\(changedIndex \+ 1\)[\s\S]*?state\.familyVariantSelections = selections/);
+});
+
+test("renders family variant values from left to right in Strapi sort order", () => {
+  assert.match(app, /sortOrder: Number\(value\.sortOrder\) \|\| 0/);
+  assert.match(app, /\.sort\(\(left, right\) => left\.sortOrder - right\.sortOrder \|\| left\.label\.localeCompare\(right\.label\)\)/);
+  assert.match(app, /familyVariantChoices: definitions\.map/);
+  assert.match(app, /savFamilyVariantChoices: Array\.isArray\(entry\.familyVariantChoices\)/);
+  const choiceResolver = app.slice(
+    app.indexOf("function getSavFamilyVariantChoices"),
+    app.indexOf("function getSavFamilyVariantHelp")
+  );
+  assert.match(choiceResolver, /savFamilyVariantChoices/);
+  assert.match(choiceResolver, /configured\.values/);
+  assert.match(choiceResolver, /return choices/);
 });
 
 test("renders accessible help for configured family variant values", () => {

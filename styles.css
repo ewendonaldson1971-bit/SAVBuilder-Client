@@ -537,8 +537,6 @@ h2 {
   line-height: 1.25;
 }
 
-.sav-family-card-brand,
-.sav-family-card-summary,
 .sav-family-card-surfaces,
 .sav-family-card-description {
   color: var(--muted);
@@ -548,11 +546,6 @@ h2 {
 
 .sav-family-card-description {
   margin-top: 2px;
-}
-
-.sav-family-card-brand {
-  color: #1d5f9f;
-  font-weight: 700;
 }
 
 .sav-family-card-action {

@@ -1635,6 +1635,12 @@
           rollOptions: option.rollOptions || [],
           variantSelections,
           familyVariantColumns: definitions.map((definition) => definition.column),
+          familyVariantChoices: definitions.map((definition) => ({
+            column: definition.column,
+            values: definition.values
+              .map((value) => value.label || value.matchValue)
+              .filter(Boolean)
+          })),
           familyVariantHelp: definitions.flatMap((definition) => definition.values.map((value) => ({
             column: definition.column,
             label: value.label || value.matchValue,
@@ -1673,12 +1679,15 @@
         name: String(definition.name || "").trim(),
         column: getSavFamilyVariantColumnName(definition.name),
         sortOrder: Number(definition.sortOrder) || 0,
-        values: getStrapiRelationItems(definition.values).map((value) => ({
-          ...value,
-          label: String(value.label || "").trim(),
-          matchValue: String(value.matchValue || "").trim(),
-          helpText: String(value.helpText || "").trim()
-        }))
+        values: getStrapiRelationItems(definition.values)
+          .map((value) => ({
+            ...value,
+            label: String(value.label || "").trim(),
+            matchValue: String(value.matchValue || "").trim(),
+            helpText: String(value.helpText || "").trim(),
+            sortOrder: Number(value.sortOrder) || 0
+          }))
+          .sort((left, right) => left.sortOrder - right.sortOrder || left.label.localeCompare(right.label))
       }))
       .filter((definition) => definition.name)
       .sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name));
@@ -1763,6 +1772,12 @@
       savOptionName: String(entry.optionName || "").trim(),
       savFamilyVariantColumns: Array.isArray(entry.familyVariantColumns) ? [...entry.familyVariantColumns] : [],
       savFamilyVariantSelections: { ...variantSelections },
+      savFamilyVariantChoices: Array.isArray(entry.familyVariantChoices)
+        ? entry.familyVariantChoices.map((definition) => ({
+            ...definition,
+            values: Array.isArray(definition.values) ? [...definition.values] : []
+          }))
+        : [],
       savFamilyVariantHelp: Array.isArray(entry.familyVariantHelp)
         ? entry.familyVariantHelp.map((value) => ({ ...value }))
         : [],
@@ -2478,7 +2493,6 @@
       const selected = familyId && familyId === selectedFamilyId;
       const image = result.rows.find((candidate) => candidate.generalImage?.url)?.generalImage;
       const imageUrl = normalizePreviewUrl(image?.url);
-      const optionCount = getProductSearchOptionCount(result.rows);
       const cardDescription = String(row.savFamilyCardDescription || "").trim();
       return `
         <button class="sav-family-card${selected ? " selected" : ""}" type="button" data-sav-family-index="${index}" aria-pressed="${selected ? "true" : "false"}">
@@ -2489,8 +2503,6 @@
           </span>
           <span class="sav-family-card-content">
             <strong>${escapeHtml(row.Product)}</strong>
-            ${row[BRAND_COLUMN] ? `<span class="sav-family-card-brand">${escapeHtml(row[BRAND_COLUMN])}</span>` : ""}
-            <span class="sav-family-card-summary">${escapeHtml(`${optionCount} ${optionCount === 1 ? "configuration" : "configurations"}`)}</span>
             ${cardDescription ? `<span class="sav-family-card-description">${escapeHtml(cardDescription)}</span>` : ""}
           </span>
           <span class="sav-family-card-action">${selected ? "Selected" : "Choose"} <span aria-hidden="true">${selected ? "✓" : "→"}</span></span>
@@ -2869,10 +2881,28 @@
   }
 
   function getSavFamilyVariantChoices(rows, column) {
-    return Array.from(new Set(rows
+    const choices = [];
+    const seen = new Set();
+    const appendChoice = (value) => {
+      const choice = String(value || "").trim();
+      if (!isMeaningfulSelectorValue(choice) || seen.has(choice)) return;
+      seen.add(choice);
+      choices.push(choice);
+    };
+
+    rows.forEach((row) => {
+      const configured = (Array.isArray(row.savFamilyVariantChoices) ? row.savFamilyVariantChoices : [])
+        .find((definition) => normalizeKey(definition.column) === normalizeKey(column));
+      (Array.isArray(configured?.values) ? configured.values : []).forEach(appendChoice);
+    });
+
+    rows
       .map((row) => getSavFamilyVariantValue(row, column))
-      .filter(isMeaningfulSelectorValue)))
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+      .filter(isMeaningfulSelectorValue)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }))
+      .forEach(appendChoice);
+
+    return choices;
   }
 
   function getSavFamilyVariantHelp(rows, column, value) {
