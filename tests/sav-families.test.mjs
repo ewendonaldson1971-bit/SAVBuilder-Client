@@ -63,6 +63,20 @@ test("shows the resolved SAV option name in the family About section", () => {
   assert.match(app, /family-detail-option-name[\s\S]*?<strong>Option:<\/strong>/);
 });
 
+test("shows authenticated JobTalk material availability in the family detail", () => {
+  assert.match(app, /\/api\/v1\/inventory\/sav-builder/);
+  assert.match(app, /body: JSON\.stringify\(\{ qcodes \}\)/);
+  assert.match(app, /function renderSavFamilyMaterialAvailability\(\)/);
+  assert.match(app, /Material availability/);
+  assert.match(app, /JobTalk product code/);
+  assert.match(app, /Available width/);
+  assert.match(app, /Print media/);
+  assert.match(app, /Material 1/);
+  assert.match(app, /Laminate/);
+  assert.match(app, /Material 2/);
+  assert.match(app, /QOH/);
+});
+
 test("uses only explicitly configured family variant types and values", () => {
   assert.match(app, /function resolveSavFamilyVariantSelections\(definitions, option\)/);
   assert.match(app, /candidate\.matchValue[\s\S]*?=== matchValue/);
@@ -84,7 +98,15 @@ test("uses only explicitly configured family variant types and values", () => {
     app.indexOf("function initializeSavFamilySelections")
   );
   assert.doesNotMatch(columnResolver, /CLASS_COLUMN|Object\.keys\(row\)|isLaminateColumnName/);
-  assert.match(app, /function applySavFamilyVariant\(column, value\)[\s\S]*?columns\.slice\(changedIndex \+ 1\)[\s\S]*?state\.familyVariantSelections = selections/);
+  const cascade = app.slice(
+    app.indexOf("function applySavFamilyVariant"),
+    app.indexOf("function syncSavFamilyPrintMode")
+  );
+  assert.match(cascade, /columns\.slice\(changedIndex \+ 1\)/);
+  assert.match(cascade, /getSavFamilyVariantChoices\(result\.rows, laterColumn\)\.filter/);
+  assert.match(cascade, /getSavFamilyRowsForSelections\(candidates, \{ \[laterColumn\]: candidate \}\)\.length > 0/);
+  assert.match(cascade, /viableValues\.find[\s\S]*?\|\| viableValues\[0\]/);
+  assert.match(cascade, /state\.familyVariantSelections = selections/);
 });
 
 test("renders family variant values from left to right in Strapi sort order", () => {
@@ -99,6 +121,20 @@ test("renders family variant values from left to right in Strapi sort order", ()
   assert.match(choiceResolver, /savFamilyVariantChoices/);
   assert.match(choiceResolver, /configured\.values/);
   assert.match(choiceResolver, /return choices/);
+});
+
+test("opens a family on the first viable values in Strapi sort order", () => {
+  const initializer = app.slice(
+    app.indexOf("function initializeSavFamilySelections"),
+    app.indexOf("function getSavFamilyRowsForSelections")
+  );
+  assert.match(initializer, /let candidates = \[\.\.\.rows\]/);
+  assert.match(initializer, /getSavFamilyVariantChoices\(rows, column\)\.find/);
+  assert.match(initializer, /getSavFamilyRowsForSelections\(candidates, \{ \[column\]: value \}\)\.length > 0/);
+  assert.match(initializer, /selections\[column\] = firstViable/);
+  assert.match(initializer, /state\.familyVariantSelections = selections/);
+  assert.match(initializer, /syncSavFamilyPrintMode\(candidates\)/);
+  assert.doesNotMatch(initializer, /firstRow/);
 });
 
 test("renders accessible help for configured family variant values", () => {

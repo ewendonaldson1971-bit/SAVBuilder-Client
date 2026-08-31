@@ -185,6 +185,11 @@
     familyDetailOpen: false,
     familyVariantSelections: {},
     familyPrintMode: "",
+    familyInventoryKey: "",
+    familyInventoryStatus: "idle",
+    familyInventoryRows: [],
+    familyInventoryError: "",
+    familyInventoryRequestId: 0,
     productSearchSelection: null,
     productSource: "strapi",
     useOffsetJoins: null,
@@ -2209,6 +2214,7 @@
       renderPricingConnection();
       showAppToast("Authoritative Pricing Service connected.");
       recalculate();
+      requestSavFamilyMaterialAvailability();
     } catch (error) {
       ui.pricingLoginError.textContent = error?.message || "Could not connect to the Pricing Service.";
     } finally {
@@ -2220,6 +2226,7 @@
     state.pricingApiToken = "";
     state.pricingApiUser = "";
     state.pricingQuoteRequestId += 1;
+    resetSavFamilyMaterialAvailability();
     state.currentCartRequest = null;
     state.authoritativeQuoteReady = false;
     window.sessionStorage.removeItem("savBuilderPricingToken");
@@ -2283,6 +2290,61 @@
         heightMm: element.height
       }))
     };
+  }
+
+  function resetSavFamilyMaterialAvailability() {
+    state.familyInventoryRequestId += 1;
+    state.familyInventoryKey = "";
+    state.familyInventoryStatus = "idle";
+    state.familyInventoryRows = [];
+    state.familyInventoryError = "";
+  }
+
+  async function requestSavFamilyMaterialAvailability() {
+    if (!state.familyDetailOpen) return;
+    const selectorState = getSavFamilySelectorState();
+    const product = selectorState.product || selectorState.previewProduct;
+    const qcodes = Array.from(new Set((product?.rolls || [])
+      .map((roll) => String(roll.qcode || "").trim())
+      .filter(Boolean)));
+    const key = `${state.pricingApiUser}|${qcodes.join("|")}`;
+    if (!PRICING_API_URL || !state.pricingApiToken || !qcodes.length) {
+      resetSavFamilyMaterialAvailability();
+      renderSavFamilyDetail(selectorState);
+      return;
+    }
+    if (state.familyInventoryKey === key && (state.familyInventoryStatus === "loading" || state.familyInventoryStatus === "ready")) return;
+
+    const requestId = ++state.familyInventoryRequestId;
+    state.familyInventoryKey = key;
+    state.familyInventoryStatus = "loading";
+    state.familyInventoryRows = [];
+    state.familyInventoryError = "";
+    renderSavFamilyDetail(selectorState);
+    try {
+      const response = await fetch(`${PRICING_API_URL}/api/v1/inventory/sav-builder`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${state.pricingApiToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ qcodes })
+      });
+      const payload = await response.json();
+      if (requestId !== state.familyInventoryRequestId || key !== state.familyInventoryKey) return;
+      if (response.status === 401) {
+        clearPricingSession();
+        showAppToast("Your Pricing Service session expired. Please connect again.", "error");
+        return;
+      }
+      if (!response.ok) throw new Error(payload.error || "Material availability lookup failed.");
+      state.familyInventoryRows = Array.isArray(payload.materials) ? payload.materials : [];
+      state.familyInventoryStatus = "ready";
+      renderSavFamilyDetail(getSavFamilySelectorState());
+    } catch (error) {
+      if (requestId !== state.familyInventoryRequestId || key !== state.familyInventoryKey) return;
+      state.familyInventoryStatus = "error";
+      state.familyInventoryRows = [];
+      state.familyInventoryError = error?.message || "Material availability lookup failed.";
+      renderSavFamilyDetail(getSavFamilySelectorState());
+    }
   }
 
   function applyAuthoritativeQuote(quote, product, elements) {
@@ -2604,6 +2666,7 @@
             <p>${escapeHtml(description || "No product description has been supplied.")}</p>
           </div>
           ${product ? renderProductSpecSheetLinks(product) : ""}
+          ${renderSavFamilyMaterialAvailability()}
         </div>
         <aside class="family-config-panel">
           <div class="family-config-title"><div><h3>Configure your SAV</h3><p>Options are supplied by Strapi.</p></div><span>01 · OPTIONS</span></div>
@@ -2615,6 +2678,51 @@
           <div class="family-selection-result"><span>${escapeHtml(selectionStatus)}</span><strong>${escapeHtml(product?.name || row.Product)}</strong></div>
         </aside>
       </div>
+    `;
+  }
+
+  function renderSavFamilyMaterialAvailability() {
+    let body = "";
+    if (!state.pricingApiToken) {
+      body = `<tr><td colspan="4" class="family-material-message">Connect pricing to load live JobTalk availability.</td></tr>`;
+    } else if (state.familyInventoryStatus === "loading") {
+      body = `<tr><td colspan="4" class="family-material-message">Loading JobTalk availability…</td></tr>`;
+    } else if (state.familyInventoryStatus === "error") {
+      body = `<tr><td colspan="4" class="family-material-message error">${escapeHtml(state.familyInventoryError || "Material availability could not be loaded.")}</td></tr>`;
+    } else {
+      const rows = state.familyInventoryRows.flatMap((entry) => {
+        const qcode = String(entry?.qcode || "").trim();
+        const materials = [
+          { label: "Print media", detail: "Material 1", value: entry?.printMedia },
+          { label: "Laminate", detail: "Material 2", value: entry?.laminate }
+        ];
+        return materials.map((material) => {
+          const code = String(material.value?.jobTalkProductCode || "").trim();
+          const widthMm = Number(material.value?.widthMm);
+          const widthLabel = Number.isFinite(widthMm) && widthMm > 0 ? `${formatInteger(widthMm)} mm` : "N/A";
+          const qohLabel = material.value ? formatStockQoh(material.value.qoh) : "N/A";
+          return `
+            <tr>
+              <td><strong>${escapeHtml(material.label)}</strong><small>${escapeHtml(material.detail)} · ${escapeHtml(qcode)}</small></td>
+              <td>${escapeHtml(code || "Not required")}</td>
+              <td>${escapeHtml(widthLabel)}</td>
+              <td>${escapeHtml(qohLabel)}</td>
+            </tr>
+          `;
+        });
+      }).join("");
+      body = rows || `<tr><td colspan="4" class="family-material-message">No JobTalk material availability was returned.</td></tr>`;
+    }
+    return `
+      <section class="family-material-availability" aria-labelledby="family-material-heading">
+        <h3 id="family-material-heading">Material availability</h3>
+        <div class="family-material-table-wrap">
+          <table>
+            <thead><tr><th>Material</th><th>JobTalk product code</th><th>Available width</th><th>QOH</th></tr></thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
+      </section>
     `;
   }
 
@@ -2842,7 +2950,9 @@
     state.familyVariantSelections = {};
     state.familyPrintMode = "";
     initializeSavFamilySelections(result.rows);
+    resetSavFamilyMaterialAvailability();
     recalculate();
+    requestSavFamilyMaterialAvailability();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -2851,6 +2961,7 @@
     state.selectedFamilyId = "";
     state.familyVariantSelections = {};
     state.familyPrintMode = "";
+    resetSavFamilyMaterialAvailability();
     state.selectedStockQcode = "";
     recalculate();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2926,15 +3037,18 @@
 
   function initializeSavFamilySelections(rows) {
     const columns = getSavFamilyVariantColumns(rows);
-    const firstRow = rows.find((row) =>
-      row.isCompleteProduct && columns.every((column) => getSavFamilyVariantValue(row, column))
-    ) || rows.find((row) => columns.every((column) => getSavFamilyVariantValue(row, column))) || rows[0];
-    if (!firstRow) return;
+    const selections = {};
+    let candidates = [...rows];
     columns.forEach((column) => {
-      const value = getSavFamilyVariantValue(firstRow, column) || getSavFamilyVariantChoices(rows, column)[0] || "";
-      if (value) state.familyVariantSelections[column] = value;
+      const firstViable = getSavFamilyVariantChoices(rows, column).find((value) =>
+        getSavFamilyRowsForSelections(candidates, { [column]: value }).length > 0
+      );
+      if (!firstViable) return;
+      selections[column] = firstViable;
+      candidates = getSavFamilyRowsForSelections(candidates, { [column]: firstViable });
     });
-    syncSavFamilyPrintMode(rows);
+    state.familyVariantSelections = selections;
+    syncSavFamilyPrintMode(candidates);
   }
 
   function getSavFamilyRowsForSelections(rows, selections = state.familyVariantSelections) {
@@ -2971,8 +3085,10 @@
     if (!candidates.length) return;
     columns.slice(changedIndex + 1).forEach((laterColumn) => {
       const current = state.familyVariantSelections[laterColumn];
-      const values = getSavFamilyVariantChoices(candidates, laterColumn);
-      const selected = values.find((candidate) => normalizeKey(candidate) === normalizeKey(current)) || values[0] || "";
+      const viableValues = getSavFamilyVariantChoices(result.rows, laterColumn).filter((candidate) =>
+        getSavFamilyRowsForSelections(candidates, { [laterColumn]: candidate }).length > 0
+      );
+      const selected = viableValues.find((candidate) => normalizeKey(candidate) === normalizeKey(current)) || viableValues[0] || "";
       if (!selected) return;
       selections[laterColumn] = selected;
       candidates = getSavFamilyRowsForSelections(candidates, { [laterColumn]: selected });
@@ -2980,7 +3096,9 @@
     state.familyVariantSelections = selections;
     syncSavFamilyPrintMode(candidates);
     state.selectedStockQcode = "";
+    resetSavFamilyMaterialAvailability();
     recalculate();
+    requestSavFamilyMaterialAvailability();
   }
 
   function syncSavFamilyPrintMode(rows) {

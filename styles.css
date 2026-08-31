@@ -692,6 +692,64 @@ h2 {
   color: var(--text);
 }
 
+.family-material-availability {
+  margin-top: 22px;
+}
+
+.family-material-availability h3 {
+  margin: 0 0 10px;
+  font: 700 1rem/1.3 var(--font-heading);
+}
+
+.family-material-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.family-material-availability table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.family-material-availability th,
+.family-material-availability td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.family-material-availability th {
+  background: #f5f8fb;
+  color: var(--muted);
+  font-size: 0.69rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.family-material-availability tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.family-material-availability td small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.family-material-availability .family-material-message {
+  padding: 14px 12px;
+  color: var(--muted);
+}
+
+.family-material-availability .family-material-message.error {
+  color: var(--red);
+}
+
 .family-config-panel {
   padding: clamp(22px, 3.5vw, 38px);
   border: 1px solid var(--line);
@@ -3729,6 +3787,17 @@ th,
 
 .wide-panel thead th {
   border-bottom: 1px solid rgba(83, 86, 90, 0.18);
+}
+
+.stock-qoh-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.stock-qoh-heading small {
+  color: var(--muted-light);
+  font-size: 0.66rem;
+  font-weight: 500;
 }
 
 .wide-panel tbody td {

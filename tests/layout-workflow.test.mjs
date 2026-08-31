@@ -161,6 +161,14 @@ test("lets users select an authoritative stock option by row", () => {
   assert.match(css, /\.stock-option-row\s*\{[\s\S]*?cursor: pointer;/);
 });
 
+test("labels authoritative QOH for print media material 1 and laminate material 2", () => {
+  assert.match(html, /stock-qoh-heading">Print media QOH<small>Material 1<\/small>/);
+  assert.match(html, /stock-qoh-heading">Laminate QOH<small>Material 2<\/small>/);
+  assert.match(app, /formatStockQoh\(option\.roll\.qohProduct\)/);
+  assert.match(app, /formatLaminateStockQoh\(option\.roll\)/);
+  assert.match(app, /inventorySource === "vivtrack" && !roll\?\.jtCodeLaminate/);
+});
+
 test("matches the Mounting Surface control shape to the Brand control", () => {
   assert.match(css, /\.brand-dropdown-trigger,[\s\S]*?min-height: 52px;[\s\S]*?padding: 7px 12px;[\s\S]*?border-radius: 7px;/);
   assert.match(css, /\.mounting-surface-select\s*\{[\s\S]*?min-height: 52px;[\s\S]*?padding: 7px 12px;[\s\S]*?border-radius: 7px;/);
